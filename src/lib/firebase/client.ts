@@ -1,8 +1,13 @@
 /**
- * Firebase client SDK singleton (browser).
+ * Firebase client SDK (browser).
+ *
+ * Lazily initialized: `getAuth`/`getFirestore`/`getStorage` are only called on
+ * first use (which happens in the browser), never at module load. This keeps the
+ * build from ever failing while prerendering pages that import this module — a
+ * missing/invalid config surfaces as a runtime auth error, not a build abort.
  *
  * Auto-connects to the local Emulator Suite when
- * NEXT_PUBLIC_USE_FIREBASE_EMULATOR=1, so development needs no real credentials.
+ * NEXT_PUBLIC_USE_FIREBASE_EMULATOR=1.
  */
 
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
@@ -27,28 +32,34 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-export const firebaseApp: FirebaseApp = getApps().length
-  ? getApp()
-  : initializeApp(firebaseConfig);
-
-export const auth: Auth = getAuth(firebaseApp);
-export const db: Firestore = getFirestore(firebaseApp);
-export const storage: FirebaseStorage = getStorage(firebaseApp);
-
-// Connect emulators once per browser session (guard against HMR double-connect).
-declare global {
-  // eslint-disable-next-line no-var
-  var __gojobEmulatorsConnected: boolean | undefined;
+function firebaseApp(): FirebaseApp {
+  return getApps().length ? getApp() : initializeApp(firebaseConfig);
 }
 
-if (
-  typeof window !== "undefined" &&
-  process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "1" &&
-  !globalThis.__gojobEmulatorsConnected
-) {
-  const host = process.env.NEXT_PUBLIC_FIREBASE_EMULATOR_HOST || "localhost";
-  connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
-  connectFirestoreEmulator(db, host, 8080);
-  connectStorageEmulator(storage, host, 9199);
-  globalThis.__gojobEmulatorsConnected = true;
+let cached: { auth: Auth; db: Firestore; storage: FirebaseStorage } | undefined;
+
+function initClient() {
+  if (cached) return cached;
+
+  const app = firebaseApp();
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+
+  if (
+    typeof window !== "undefined" &&
+    process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "1"
+  ) {
+    const host = process.env.NEXT_PUBLIC_FIREBASE_EMULATOR_HOST || "localhost";
+    connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
+    connectFirestoreEmulator(db, host, 8080);
+    connectStorageEmulator(storage, host, 9199);
+  }
+
+  cached = { auth, db, storage };
+  return cached;
 }
+
+export const getClientAuth = (): Auth => initClient().auth;
+export const getClientDb = (): Firestore => initClient().db;
+export const getClientStorage = (): FirebaseStorage => initClient().storage;

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
-import { db } from "@/lib/firebase/client";
+import { getClientDb } from "@/lib/firebase/client";
 import { markReadAction, sendMessageAction } from "@/app/_actions/chat";
 import { cn } from "@/lib/cn";
 import type { Message } from "@/lib/types";
@@ -28,7 +28,7 @@ export function ChatWindow({
 
   useEffect(() => {
     const q = query(
-      collection(db, "conversations", conversationId, "messages"),
+      collection(getClientDb(), "conversations", conversationId, "messages"),
       orderBy("createdAt", "asc"),
     );
     const unsub = onSnapshot(
