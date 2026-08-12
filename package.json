@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "emulators": "npx --yes firebase-tools emulators:start --project demo-gojob",
     "seed": "tsx scripts/seed.ts",
+    "seed:prod": "tsx scripts/seed.ts --prod",
     "format": "prettier --write ."
   },
   "dependencies": {

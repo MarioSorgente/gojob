@@ -16,16 +16,11 @@
  */
 
 import { config } from "dotenv";
-config({ path: ".env.local" });
-
-// Make sure the Admin SDK targets the emulators (no credentials needed).
-process.env.FIRESTORE_EMULATOR_HOST ||= "localhost:8080";
-process.env.FIREBASE_AUTH_EMULATOR_HOST ||= "localhost:9099";
-process.env.FIREBASE_STORAGE_EMULATOR_HOST ||= "localhost:9199";
-
-import { getApps, initializeApp } from "firebase-admin/app";
+import { existsSync, readFileSync } from "node:fs";
+import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { adminAppOptions } from "../src/lib/firebase/credentials";
 import { computeMatch } from "../src/lib/matching";
 import { computeProfileStrength } from "../src/lib/profileStrength";
 import { totalExperienceYears } from "../src/lib/dates";
@@ -42,12 +37,53 @@ import type {
   VerificationStatus,
 } from "../src/lib/types";
 
-const PROJECT_ID = process.env.FIREBASE_ADMIN_PROJECT_ID || "demo-gojob";
+config({ path: ".env.local" });
+
+/** `--prod` seeds the real Firebase project; default seeds the local emulator. */
+const PROD = process.argv.includes("--prod");
+
+if (PROD) {
+  // Target the real project: strip any emulator routing from the env.
+  delete process.env.FIRESTORE_EMULATOR_HOST;
+  delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
+  delete process.env.FIREBASE_STORAGE_EMULATOR_HOST;
+  process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR = "0";
+} else {
+  // Default: local emulator, no credentials required.
+  process.env.FIRESTORE_EMULATOR_HOST ||= "localhost:8080";
+  process.env.FIREBASE_AUTH_EMULATOR_HOST ||= "localhost:9099";
+  process.env.FIREBASE_STORAGE_EMULATOR_HOST ||= "localhost:9199";
+}
+
 const PASSWORD = "demo1234";
 
-const app = getApps().length
-  ? getApps()[0]
-  : initializeApp({ projectId: PROJECT_ID });
+function buildApp(): App {
+  if (getApps().length) return getApps()[0];
+  if (PROD) {
+    // Simplest path: GOOGLE_APPLICATION_CREDENTIALS points at the downloaded
+    // serviceAccount.json. cert() reads the file; project id comes from it.
+    const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (keyPath && existsSync(keyPath)) {
+      const raw = JSON.parse(readFileSync(keyPath, "utf8")) as { project_id?: string };
+      return initializeApp({ credential: cert(keyPath), projectId: raw.project_id });
+    }
+    return initializeApp(adminAppOptions());
+  }
+  return initializeApp(adminAppOptions());
+}
+
+const app = buildApp();
+const PROJECT_ID = app.options.projectId || "demo-gojob";
+
+if (PROD && PROJECT_ID === "demo-gojob") {
+  console.error(
+    "Refusing to seed: no real credentials found.\n" +
+      "Point GOOGLE_APPLICATION_CREDENTIALS at your serviceAccount.json (or set the\n" +
+      "FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY vars) in .env.local, then retry.",
+  );
+  process.exit(1);
+}
+
 const auth = getAuth(app);
 const db = getFirestore(app);
 
@@ -332,7 +368,7 @@ const OTHER_CANDIDATES: Omit<CandidateSeed, "uid">[] = [
 ];
 
 async function main() {
-  console.log(`Seeding project "${PROJECT_ID}" via emulator…`);
+  console.log(`Seeding project "${PROJECT_ID}" (${PROD ? "PRODUCTION" : "emulator"})…`);
 
   // --- Employer + business ---
   const employerUid = await ensureAuthUser("owner@milkandmadu.demo", "Milk & Madu Owner");
