@@ -159,6 +159,40 @@ private keys, which is the single most common Vercel paste error.
 
 ---
 
+## Why the production build uses webpack, not Turbopack
+
+`npm run build` runs `next build --webpack`. This is a workaround, not a
+preference — remove it once the upstream Turbopack bug is fixed.
+
+Next 16 builds with Turbopack by default, and Turbopack loads server-external
+packages (`firebase-admin` is on Next's default externals list) through its own
+CJS shim rather than letting Node resolve them. On Vercel that shim fails:
+
+```
+Failed to load external module firebase-admin-a14c8a5423a75469/auth:
+  ERR_REQUIRE_ESM: require() of ES Module …/jose/dist/webapi/index.js
+  from …/jwks-rsa/src/utils.js not supported
+  at Context.externalImport (.next/server/chunks/ssr/[turbopack]_runtime.js)
+```
+
+The chain is `firebase-admin` → `jwks-rsa` (CJS, `require('jose')`) → `jose@6`,
+which is pure ESM: `"type": "module"`, and its `exports` map has no `require`
+condition.
+
+This is **not** a dependency problem. Node 22.12+/24 natively supports
+`require()` of ESM without top-level await, and on plain Node 24
+`require('firebase-admin/auth')` succeeds. Only Turbopack's shim fails, and only
+in the Vercel lambda — a local `next build` + `next start` with Turbopack serves
+these routes fine, which is why this reached production undetected. It took down
+every server route that touches Firebase: login, both dashboards, admin, all of
+it. Webpack emits a plain `require()` that Node executes itself, so the native
+`require(esm)` support applies and the chain loads.
+
+See vercel/next.js#87737 and #87686 for the wider class of Turbopack
+external-module failures.
+
+---
+
 ## Conventions
 
 - **`"server-only"`** at the top of every repo module — importing one into a

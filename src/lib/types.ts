@@ -199,7 +199,9 @@ export interface CandidateSummary {
 }
 
 /**
- * A (job, candidate) pair. Stored at `jobs/{jobId}/candidates/{candidateId}`.
+ * A (job, candidate) pair. Stored at `jobs/{jobId}/shortlist/{candidateId}`
+ * — named `shortlist`, not `candidates`, so the collection-group query in
+ * pipeline.ts doesn't collide with the top-level `candidates` collection.
  * Denormalizes the scope's CandidateJobMatch + Application + Invitation + Match
  * per pair, and drives the swipe deck and the hiring pipeline.
  */

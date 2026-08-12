@@ -153,8 +153,34 @@ server actions, security rules).
 ## Testing on the live site without real users
 
 Your production Firestore starts empty, so post-a-job shows zero candidates.
-Seed the same demo data (Milk & Madu + Ayu + 13 candidates + a live job) into
-your **real** project:
+Seed the demo marketplace into your **real** project by either route below —
+both call the same `runSeed()` in `src/lib/demo/seed.ts`, so they produce
+identical data.
+
+### From the browser (no terminal, no service-account file)
+
+The deployment already holds Firebase credentials, so it can seed itself.
+
+1. In Vercel → Settings → Environment Variables add:
+   - `ENABLE_DEMO_TOOLS` = `1`
+   - `DEMO_SEED_TOKEN` = any long random string you choose
+2. **Redeploy** — Vercel only applies env changes to new deployments.
+3. Open `/setup`, paste the token, then:
+   - **Check status** first. It reports which Firebase project the deployment is
+     actually writing to, and which credential variables resolved. If it says
+     `demo-gojob`, your admin env vars aren't set and nothing else will work.
+   - **Seed demo data** — idempotent, safe to re-run.
+   - **Reset demo data** removes seeded documents and the three demo accounts,
+     leaving accounts you registered yourself intact.
+   - **Grant a role** promotes an existing login (sign up first). This is the
+     only way to reach `/admin`, since onboarding offers just employer and
+     candidate.
+4. When you're done, delete `ENABLE_DEMO_TOOLS` and redeploy. The page and the
+   endpoint both 404 without it.
+
+Treat `DEMO_SEED_TOKEN` as a real secret: it can create and delete data.
+
+### From the command line
 
 1. Download a service-account key (Project settings → Service accounts →
    Generate new private key). Save it as `serviceAccount.json` in the project
@@ -166,15 +192,23 @@ your **real** project:
    npm run seed:prod
    ```
 
-   (It refuses to run unless it finds real credentials.) Then on the deployed
-   site, open two browsers (or one + an incognito window) and log in as the
-   employer and the candidate — password `demo1234`:
-   - Employer `owner@milkandmadu.demo` → post a Barista job → invite Ayu
-   - Candidate `ayu@gojob.demo` → accept the invite → chat → schedule interview
-   - Employer → Mark as Hired
+   It refuses to run unless it finds real credentials.
 
-To wipe and reseed, delete the `candidates`, `businesses`, `jobs`, `users`
-collections in the Firestore console and run `npm run seed:prod` again.
+### What you get, and what to try
+
+Milk & Madu (Canggu, verified) with four jobs, Revolver Café with a Head Barista
+job, Sunset Warung awaiting verification, and 23 candidates. Three applications
+and one full match with a chat thread are pre-staged, and both admin
+verification queues have items waiting.
+
+On the deployed site, open two browsers (or one + an incognito window) and log
+in — password `demo1234`:
+
+- Employer `owner@milkandmadu.demo` → review the Barista shortlist → invite
+- Candidate `ayu@gojob.demo` → open Chats (a conversation is already waiting) →
+  schedule an interview
+- Employer → Mark as Hired
+- Admin `admin@gojob.demo` → `/admin` → work the verification queues
 
 ## Project structure
 
@@ -194,7 +228,8 @@ src/
     taxonomy.ts      roles, areas, employment types, languages, skills
     firebase/        client + admin SDK wiring
     repos/           Firestore data access (server-only)
-scripts/seed.ts      demo data for the emulator
+    demo/            demo fixture data + seed/reset/status engine
+scripts/seed.ts      CLI wrapper around lib/demo/seed.ts
 firestore.rules · firestore.indexes.json · storage.rules · firebase.json
 ```
 
@@ -204,7 +239,9 @@ firestore.rules · firestore.indexes.json · storage.rules · firebase.json
 onboarding, profiles + profile strength, job creation, the deterministic
 matching engine, recommended candidates (swipe) & recommended jobs, apply /
 invite / mutual match, realtime chat, interview scheduling, hiring pipeline +
-Mark as Hired, demo seed data.
+Mark as Hired, demo seed data, admin panel, ID/employment verification
+workflows, Instagram/WhatsApp/QR sharing, employer candidate search, pricing UI.
 
-**Deferred (later phases):** admin panel, ID/employment verification workflows,
-payments, Instagram/WhatsApp/QR sharing, standalone employer candidate search.
+**Deferred (later phases):** payments (the plans page is preview-only, no
+billing connected), notifications of any kind, job editing after posting,
+pagination, and languages beyond English.

@@ -77,6 +77,22 @@ export function isEmulator(): boolean {
   );
 }
 
+/**
+ * Which branch of adminAppOptions() the current environment resolves to.
+ * Reported by the demo status endpoint so a misconfigured deployment is
+ * diagnosable from the browser instead of by guesswork.
+ */
+export function credentialSource(): string {
+  if (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+    return "FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY";
+  }
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.trim()) {
+    return "FIREBASE_SERVICE_ACCOUNT_KEY";
+  }
+  if (isEmulator()) return "emulator (no credentials)";
+  return "applicationDefault() / GOOGLE_APPLICATION_CREDENTIALS";
+}
+
 /** Build the options object for firebase-admin initializeApp(). */
 export function adminAppOptions(): AppOptions {
   const projectId = projectIdFromEnv();
