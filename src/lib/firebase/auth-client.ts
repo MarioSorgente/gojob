@@ -18,7 +18,7 @@ import {
   type ConfirmationResult,
   type User,
 } from "firebase/auth";
-import { auth } from "./client";
+import { getClientAuth } from "./client";
 
 /** POST the current ID token to mint a session cookie. */
 async function establishSession(user: User): Promise<void> {
@@ -36,6 +36,7 @@ export async function registerWithEmail(
   password: string,
   displayName: string,
 ): Promise<void> {
+  const auth = getClientAuth();
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   if (displayName) await updateProfile(cred.user, { displayName });
   await establishSession(cred.user);
@@ -45,11 +46,13 @@ export async function loginWithEmail(
   email: string,
   password: string,
 ): Promise<void> {
+  const auth = getClientAuth();
   const cred = await signInWithEmailAndPassword(auth, email, password);
   await establishSession(cred.user);
 }
 
 export async function loginWithGoogle(): Promise<void> {
+  const auth = getClientAuth();
   const provider = new GoogleAuthProvider();
   const cred = await signInWithPopup(auth, provider);
   await establishSession(cred.user);
@@ -60,6 +63,7 @@ export async function startPhoneSignIn(
   phoneNumber: string,
   recaptchaContainerId: string,
 ): Promise<ConfirmationResult> {
+  const auth = getClientAuth();
   // In the emulator, reCAPTCHA is bypassed but a verifier is still required.
   if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "1") {
     auth.settings.appVerificationDisabledForTesting = true;
@@ -81,5 +85,5 @@ export async function confirmPhoneCode(
 
 export async function logout(): Promise<void> {
   await fetch("/api/session", { method: "DELETE" });
-  await signOut(auth);
+  await signOut(getClientAuth());
 }
