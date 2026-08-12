@@ -21,6 +21,7 @@ export default async function EmployerAppLayout({
 
   const items = [
     { href: "/employer", label: "Jobs", icon: "🧭" },
+    { href: "/employer/candidates", label: "Find", icon: "🔍" },
     { href: "/employer/matches", label: "Chats", icon: "💬", badge: unread || undefined },
     { href: "/employer/business", label: "Venue", icon: "🏝️" },
   ];

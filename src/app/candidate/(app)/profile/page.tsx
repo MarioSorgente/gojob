@@ -116,11 +116,18 @@ export default async function CandidateProfilePage() {
         )}
       </Card>
 
-      <Link href="/candidate/edit">
-        <Button variant="outline" className="w-full">
-          Edit profile
-        </Button>
-      </Link>
+      <div className="grid grid-cols-2 gap-3">
+        <Link href="/candidate/edit">
+          <Button variant="outline" className="w-full">
+            Edit profile
+          </Button>
+        </Link>
+        <Link href="/candidate/verification">
+          <Button variant="outline" className="w-full">
+            Verification
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }

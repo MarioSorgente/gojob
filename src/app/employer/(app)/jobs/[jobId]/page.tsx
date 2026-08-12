@@ -5,6 +5,7 @@ import { getJob } from "@/lib/repos/jobs";
 import { getShortlist } from "@/lib/repos/pipeline";
 import { formatSalaryRange } from "@/lib/cn";
 import { Badge, Card, EmptyState } from "@/components/ui";
+import { ShareJob } from "@/components/ShareJob";
 import { SwipeDeck, type DeckCandidate } from "@/components/employer/SwipeDeck";
 import { ApplicantRow } from "@/components/employer/ApplicantRow";
 import { InviteButton } from "@/components/employer/InviteButton";
@@ -75,6 +76,13 @@ export default async function EmployerJobDetail({
           📍 {job.area} · {job.employmentType} · 💰{" "}
           {formatSalaryRange(job.salaryType, job.salaryMin, job.salaryMax) || "—"}
         </p>
+        <div className="mt-3">
+          <ShareJob
+            jobId={job.id}
+            role={job.role}
+            businessName={job.businessName}
+          />
+        </div>
       </div>
 
       <section>

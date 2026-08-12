@@ -3,6 +3,7 @@ import { adminDb } from "../firebase/admin";
 import { COLLECTIONS } from "../collections";
 import { computeProfileStrength } from "../profileStrength";
 import { totalExperienceYears } from "../dates";
+import { candidateMatchesFilters, type CandidateFilters } from "../search";
 import type {
   CandidateProfile,
   CandidateSummary,
@@ -87,6 +88,23 @@ export async function listCandidatesForRole(
 export async function listAllCandidates(): Promise<CandidateProfile[]> {
   const snap = await col().get();
   return snap.docs.map((d) => d.data() as CandidateProfile);
+}
+
+/**
+ * Employer candidate search (scope §18). Role is pushed down to Firestore when
+ * given; the remaining filters are applied in memory (see lib/search.ts).
+ * Results are sorted by profile strength so complete profiles surface first.
+ */
+export async function searchCandidates(
+  filters: CandidateFilters,
+): Promise<CandidateProfile[]> {
+  const candidates = filters.role
+    ? await listCandidatesForRole(filters.role)
+    : await listAllCandidates();
+
+  return candidates
+    .filter((c) => candidateMatchesFilters(c, { ...filters, role: undefined }))
+    .sort((a, b) => b.profileStrength - a.profileStrength);
 }
 
 /** Build the compact card summary denormalized onto shortlist docs. */

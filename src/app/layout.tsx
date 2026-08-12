@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Geist } from "next/font/google";
+import { ToastProvider } from "@/components/Toast";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+// Typography uses the native system font stack (see globals.css). No webfont
+// fetch means no build-time dependency on a font CDN, no render-blocking
+// request, and no layout shift — which matters on slow mobile connections.
 
 export const metadata: Metadata = {
   title: "GoJob — Hospitality hiring for Bali",
@@ -16,8 +15,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} h-full`}>
-      <body className="min-h-full">{children}</body>
+    <html lang="en" className="h-full">
+      <body className="min-h-full">
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }

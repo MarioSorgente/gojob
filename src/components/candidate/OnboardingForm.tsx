@@ -79,9 +79,12 @@ const toNum = (v: string): number | null => {
 export function OnboardingForm({
   defaults,
   submitLabel = "Save & see jobs",
+  next,
 }: {
   defaults?: Partial<CandidateOnboardingInput>;
   submitLabel?: string;
+  /** Where to land after saving (carries a shared job link through signup). */
+  next?: string;
 }) {
   const [firstName, setFirstName] = useState(defaults?.firstName ?? "");
   const [lastName, setLastName] = useState(defaults?.lastName ?? "");
@@ -173,7 +176,7 @@ export function OnboardingForm({
         endDate: e.current ? null : e.endDate || null,
       })),
     };
-    startTransition(() => saveCandidateProfile(payload));
+    startTransition(() => saveCandidateProfile(payload, next));
   }
 
   return (

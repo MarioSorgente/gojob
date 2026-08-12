@@ -4,7 +4,15 @@ A simple hospitality hiring marketplace for Bali. Post a job and instantly see
 the most relevant available candidates — replacing Instagram DMs and WhatsApp
 CVs with one clean flow: **post → match → invite → chat → interview → hire.**
 
-This repo is the **MVP foundation + end-to-end demo loop**.
+All 33 MVP screens from the product scope are built.
+
+## Documentation
+
+| Doc | What's in it |
+| --- | --- |
+| [docs/STATUS.md](docs/STATUS.md) | **Where we are** — every screen vs. the scope, feature-by-feature |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | **What's missing** — honest gaps, risks, next milestones |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How it works and why — data model, matching, conventions |
 
 ## Stack
 
@@ -13,6 +21,18 @@ This repo is the **MVP foundation + end-to-end demo loop**.
   Storage (uploads), realtime chat via `onSnapshot`
 - Deterministic, unit-tested **matching engine** (no LLM) — scope §9
 - Deploys to **Vercel**
+
+## What it does
+
+- **Candidates** build a profile (roles, area, salary, availability, languages,
+  skills, experience), see ranked job recommendations, search/filter jobs, apply,
+  accept invitations, chat, and schedule interviews. Always free.
+- **Employers** create a venue, post a job and *immediately* get a ranked,
+  explainable shortlist, screen candidates by swipe, search the whole talent pool,
+  invite, chat on mutual match, schedule interviews, and mark hires.
+- **Sharing** — every job has a public page with copy link / WhatsApp / Instagram
+  / QR. A logged-out applicant is carried through signup and lands back on the job.
+- **Admin** — verification queues, users, businesses, jobs, marketplace metrics.
 
 ## Prerequisites
 
@@ -54,10 +74,11 @@ Open http://localhost:3000.
 
 ### Demo logins (password: `demo1234`)
 
-| Role      | Email                    |
-| --------- | ------------------------ |
-| Employer  | `owner@milkandmadu.demo` |
-| Candidate | `ayu@gojob.demo`         |
+| Role      | Email                    | Lands on   |
+| --------- | ------------------------ | ---------- |
+| Employer  | `owner@milkandmadu.demo` | `/employer` |
+| Candidate | `ayu@gojob.demo`         | `/candidate` |
+| Admin     | `admin@gojob.demo`       | `/admin`    |
 
 ### The demo story (scope §31)
 
@@ -72,14 +93,34 @@ Open http://localhost:3000.
 You can also register brand-new employer/candidate accounts and go through
 onboarding from scratch.
 
+### Worth trying beyond the core loop
+
+- **Share a job** — on the employer's job page tap **Share job** for the copy
+  link / WhatsApp / QR sheet. Open that link in a private window (logged out) to
+  see the public job page, then **Apply through GoJob** → it carries you through
+  signup and onboarding and lands you back on the job.
+- **Find Candidates** (employer → 🔍) — browse the whole pool without posting a
+  job. Contact details stay hidden; the only action is Invite.
+- **Search jobs** (candidate → 🔍) — filter by role/area/type/salary, still
+  ranked by match score.
+- **Verification** (candidate → Profile → Verification) — upload an ID, then log
+  in as the **admin** to approve it in `/admin/verifications` and watch the
+  candidate's Profile Strength rise.
+- **Admin metrics** — `/admin` shows applications, matches, hires and
+  matches-per-live-job.
+
 ## Testing & checks
 
 ```bash
-npm run test        # Vitest — matching engine + profile strength
+npm run test        # Vitest — matching, profile strength, search filters
 npm run typecheck   # tsc --noEmit across the whole project
 npm run build       # production build
 npm run lint        # eslint
 ```
+
+Current state: **21 unit tests passing, typecheck clean, 34 routes building.**
+See [docs/ROADMAP.md](docs/ROADMAP.md) for what testing is still missing (E2E,
+server actions, security rules).
 
 ## Deploying to Vercel (with a real Firebase project)
 

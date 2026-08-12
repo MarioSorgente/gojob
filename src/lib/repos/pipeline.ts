@@ -1,7 +1,9 @@
 import "server-only";
 import { adminDb } from "../firebase/admin";
 import { COLLECTIONS } from "../collections";
+import { computeMatch } from "../matching";
 import { getJob } from "./jobs";
+import { getCandidate, toCandidateSummary } from "./candidates";
 import type {
   Conversation,
   EmployerAction,
@@ -171,6 +173,47 @@ export interface ActionResult {
   matched: boolean;
   matchId?: string;
   conversationId?: string;
+}
+
+/**
+ * Make sure a (job, candidate) shortlist row exists, scoring it if it doesn't.
+ * Needed when an employer invites someone found via search (§18) who wasn't in
+ * the job's auto-generated pool.
+ */
+export async function ensureShortlistEntry(
+  jobId: string,
+  candidateId: string,
+): Promise<JobCandidate> {
+  const existing = await getJobCandidate(jobId, candidateId);
+  if (existing) return existing;
+
+  const [job, candidate] = await Promise.all([
+    getJob(jobId),
+    getCandidate(candidateId),
+  ]);
+  if (!job) throw new Error("Job not found");
+  if (!candidate) throw new Error("Candidate not found");
+
+  const { score, breakdown, reasons } = computeMatch(job, candidate);
+  const now = new Date().toISOString();
+  const entry: JobCandidate = {
+    jobId,
+    candidateId,
+    businessId: job.businessId,
+    score,
+    breakdown,
+    reasons,
+    employerAction: "none",
+    candidateAction: "none",
+    stage: "recommended",
+    matchId: null,
+    conversationId: null,
+    candidateSummary: toCandidateSummary(candidate),
+    createdAt: now,
+    updatedAt: now,
+  };
+  await shortlistDoc(jobId, candidateId).set(entry);
+  return entry;
 }
 
 /** Employer taps Pass / Save / Invite on a candidate card. */
