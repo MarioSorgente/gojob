@@ -4,6 +4,13 @@ import { COLLECTIONS } from "../collections";
 import { computeProfileStrength } from "../profileStrength";
 import { totalExperienceYears } from "../dates";
 import { candidateMatchesFilters, type CandidateFilters } from "../search";
+import {
+  PAGE_SIZE,
+  decodeCursor,
+  encodeCursor,
+  paginateFiltered,
+  type Page,
+} from "../pagination";
 import type {
   CandidateProfile,
   CandidateSummary,
@@ -90,22 +97,59 @@ export async function listAllCandidates(): Promise<CandidateProfile[]> {
   return snap.docs.map((d) => d.data() as CandidateProfile);
 }
 
-/**
- * Employer candidate search (scope §18). Role is pushed down to Firestore when
- * given; the remaining filters are applied in memory (see lib/search.ts).
- * Results are sorted by profile strength so complete profiles surface first.
- */
-export async function searchCandidates(
-  filters: CandidateFilters,
-): Promise<CandidateProfile[]> {
-  const candidates = filters.role
-    ? await listCandidatesForRole(filters.role)
-    : await listAllCandidates();
-
-  return candidates
-    .filter((c) => candidateMatchesFilters(c, { ...filters, role: undefined }))
-    .sort((a, b) => b.profileStrength - a.profileStrength);
+interface CandidateCursor {
+  strength: number;
+  id: string;
 }
+
+/**
+ * Employer candidate search (scope §18), one page at a time.
+ *
+ * Only `role` is pushed into the query. Firestore permits a single
+ * `array-contains` per query and cannot order by profileStrength while
+ * filtering an inequality, so pushing every filter down would need a composite
+ * index for each combination of filters the UI can produce. Instead the most
+ * selective filter narrows the read, the rest run in memory over paged
+ * batches, and paginateFiltered over-fetches to fill the page.
+ *
+ * The important property: reads now scale with the page, not the collection.
+ */
+export async function searchCandidatesPage(
+  filters: CandidateFilters,
+  cursor: string | null,
+  pageSize = PAGE_SIZE,
+): Promise<Page<CandidateProfile>> {
+  const residual: CandidateFilters = { ...filters, role: undefined };
+
+  return paginateFiltered<CandidateProfile>({
+    startCursor: cursor,
+    pageSize,
+    keep: (c) => candidateMatchesFilters(c, residual),
+    cursorOf: (c) =>
+      encodeCursor<CandidateCursor>({
+        strength: c.profileStrength ?? 0,
+        id: c.userId,
+      }),
+    fetchBatch: async (after, limit) => {
+      const base = filters.role
+        ? col().where("roles", "array-contains", filters.role)
+        : col();
+
+      // Tie-break on userId: without a unique final sort key, documents sharing
+      // a profileStrength can repeat or disappear across page boundaries.
+      let q = base
+        .orderBy("profileStrength", "desc")
+        .orderBy("userId", "desc");
+
+      const start = decodeCursor<CandidateCursor>(after);
+      if (start) q = q.startAfter(start.strength, start.id);
+
+      const snap = await q.limit(limit).get();
+      return snap.docs.map((d) => d.data() as CandidateProfile);
+    },
+  });
+}
+
 
 /** Build the compact card summary denormalized onto shortlist docs. */
 export function toCandidateSummary(c: CandidateProfile): CandidateSummary {

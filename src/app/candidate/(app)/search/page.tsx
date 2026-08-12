@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { getCandidate } from "@/lib/repos/candidates";
-import { searchJobsForCandidate } from "@/lib/repos/jobs";
+import { recommendedJobsPage } from "@/lib/repos/jobs";
 import { AREAS, EMPLOYMENT_TYPES, ROLES } from "@/lib/taxonomy";
-import { EmptyState, PageTitle } from "@/components/ui";
+import { PageTitle } from "@/components/ui";
 import { FilterBar, type FilterField } from "@/components/FilterBar";
-import { JobCard } from "@/components/cards/JobCard";
+import { JobResults } from "@/components/candidate/JobResults";
 
 const FIELDS: FilterField[] = [
   { name: "role", label: "Role", type: "select", options: ROLES },
@@ -37,42 +37,28 @@ export default async function CandidateJobSearch({
   const one = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
   const minSalaryRaw = one("minSalary");
 
-  const results = await searchJobsForCandidate(candidate, {
+  const filters = {
     role: one("role"),
     area: one("area"),
     employmentType: one("employmentType"),
     minSalary: minSalaryRaw ? Number(minSalaryRaw) || undefined : undefined,
     query: one("q"),
-  });
+  };
+
+  const firstPage = await recommendedJobsPage(candidate, filters, null);
 
   return (
     <>
       <PageTitle title="Search jobs" subtitle="All open jobs, ranked for you" />
       <FilterBar fields={FIELDS} searchPlaceholder="Search role, venue, area…" />
 
-      <p className="mb-2 text-sm text-muted">
-        {results.length} job{results.length === 1 ? "" : "s"}
-      </p>
-
-      {results.length === 0 ? (
-        <EmptyState
-          icon="🔍"
-          title="No jobs match those filters"
-          hint="Try clearing a filter or widening the area."
-        />
-      ) : (
-        <div className="space-y-3">
-          {results.map((r) => (
-            <JobCard
-              key={r.job.id}
-              job={r.job}
-              score={r.score}
-              reasons={r.reasons}
-              href={`/candidate/jobs/${r.job.id}`}
-            />
-          ))}
-        </div>
-      )}
+      <JobResults
+        initialItems={firstPage.items}
+        initialCursor={firstPage.nextCursor}
+        filters={filters}
+        emptyTitle="No jobs match those filters"
+        emptyHint="Try clearing a filter or widening the area."
+      />
     </>
   );
 }

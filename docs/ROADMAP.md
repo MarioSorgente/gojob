@@ -18,39 +18,57 @@ chat. Server actions authenticate the caller but never throttle.
 **Fix:** per-uid rate limits on `sendMessage`, invite, and apply (Upstash
 Redis or Firestore counters), plus App Check on the client SDK.
 
-### 2. Search doesn't scale 🔴
-`searchCandidates` / `searchJobsForCandidate` read the whole collection and
-filter in memory (`src/lib/search.ts`). Fine for hundreds of records; at a few
-thousand it gets slow and expensive, and Firestore reads are billed per document.
-**Fix:** move to Algolia/Typesense, or precompute filter fields + composite
-indexes and paginate. Cursor-based pagination is missing everywhere too — every
-list renders its full result set.
+### 2. Search reads are bounded, but ranking still isn't ✅🟡
+**Done:** lists page with opaque cursors (`src/lib/pagination.ts`), and
+candidate search pushes its most selective filter into Firestore, over-fetching
+to fill a page after the residual in-memory predicates run. Reads now scale with
+the page rather than the collection.
 
-### 3. Shortlist generation is synchronous and unbounded 🟠
-Publishing a job scores every role-matching candidate in one request and writes
-them in a single `batch()`. Firestore batches cap at **500 writes**, so a job
-matching more than 500 candidates will throw.
-**Fix:** chunk the batch, and move generation to a background job (Cloud Task /
-queue) with the UI polling for readiness.
+**Still open:** Firestore allows one `array-contains` per query and can't order
+by `profileStrength` while filtering an inequality, so the remaining filters
+(experience, salary, language level, free text) run in memory — pushing them all
+down would need a composite index per filter combination. Job ranking is worse:
+match scores are per-candidate, so Firestore can't sort them at all. The
+candidate feed ranks a capped window (`MAX_RANKED_JOBS`, 500 newest live jobs)
+and pages the ranked array. **Fix at scale:** a search service that can sort by a
+stored score (Algolia/Typesense).
 
-### 4. No re-matching when data changes 🟠
-The shortlist is computed at publish time only. If a candidate signs up or
-updates their profile afterwards, they never appear for existing jobs.
-**Fix:** a Cloud Function on candidate write that upserts shortlist rows for
-live jobs, or a scheduled nightly re-score.
+### 3. Shortlist generation is chunked and off the request ✅
+**Done:** writes are chunked below Firestore's 500-op batch cap
+(`src/lib/chunk.ts`), and publishing a job now returns immediately — generation
+runs in `after()`, the job carries `shortlistStatus`, and the job page polls
+until it's ready or reports failure.
 
-### 5. Storage rules trust the client path 🟠
-`storage.rules` scopes uploads to `users/{uid}/...`, but nothing validates that
-the URL a client sends to `updatePhotoAction` is actually one of *their*
-uploads — a user could pass any URL string.
-**Fix:** validate the URL's path prefix server-side before persisting.
+**Note:** `after()` extends the same serverless invocation rather than being a
+true queue, so a pool large enough to exceed the function timeout would still be
+cut short (the job is marked `failed`, and the nightly re-score repairs it). A
+real queue (Cloud Tasks) is the next step if pools get that big.
 
-### 6. No tests above the unit level 🟠
-21 unit tests cover matching, profile strength, and search predicates. There is
-**no** coverage of server actions, the mutual-match state machine, or any UI.
-The match/invite/hire flow has only ever been verified by hand.
-**Fix:** Playwright E2E against the emulator for the demo story, plus
-integration tests for `pipeline.ts` (the trickiest logic in the codebase).
+### 4. Re-matching when data changes ✅
+**Done:** `src/lib/repos/rematch.ts` re-scores a candidate across every live job
+matching their roles, run from profile saves and admin verification decisions,
+plus a nightly sweep at `/api/cron/rescore` as a backstop. Rows the candidate is
+no longer eligible for are removed **only** when untouched — anything carrying
+pipeline state is kept, so removing a role can't destroy a live conversation.
+Implemented in-app rather than as a Cloud Function to avoid a second deploy
+target; move it to a Firestore trigger if writes start arriving from outside
+this app.
+
+### 5. Storage references are validated server-side ✅
+**Done:** `src/lib/storagePaths.ts` re-derives the object path from a download
+URL or raw path and asserts the `users/{uid}/{public|private}/` prefix, enforced
+in the photo, ID-document and logo actions. Covers cross-user paths, wrong
+scope, uid prefix collisions, traversal, and off-site URLs.
+
+### 6. Tests above the unit level ✅🟡
+**Done:** 92 tests. `pipeline.ts` and `rematch.ts` now have integration coverage
+against an in-memory Firestore double (`src/lib/repos/testing/fakeFirestore.ts`)
+— the full apply/invite/match/hire state machine, including idempotency and the
+two Apply/Pass regressions.
+
+**Still open:** no browser-level E2E. Playwright against the emulator is the
+right next step, but the emulator needs a JVM, which is why the double exists.
+No UI component tests.
 
 ### 7. Firestore rules are barely tested 🟡
 Rules exist and are deliberately restrictive (server does privileged work via
@@ -93,12 +111,13 @@ employer CRM · complex subscription limits · native mobile app.
 ## Suggested next milestones
 
 **Milestone 1 — Make it safe to let people in**
-Rate limiting + App Check · batch chunking · server-side URL validation ·
-Playwright E2E of the demo story · pagination on every list.
+Rate limiting + App Check · ~~batch chunking~~ ✅ · ~~server-side URL
+validation~~ ✅ · ~~pagination on every list~~ ✅ · Playwright E2E of the demo
+story (still outstanding — needs a JVM for the emulator).
 
 **Milestone 2 — Make it sticky**
 Email/push notifications for invitations, matches, and messages (the single
-highest-leverage addition) · re-matching on profile change · job editing ·
+highest-leverage addition) · ~~re-matching on profile change~~ ✅ · job editing ·
 Bahasa Indonesia.
 
 **Milestone 3 — Make it a business**
