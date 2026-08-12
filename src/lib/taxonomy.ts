@@ -5,8 +5,8 @@
  * and matching engine share one source of truth. All role/language/skill fields
  * support `"Other"` free text, so these are *suggestions*, not a closed set.
  *
- * The skills taxonomy (SKILL_SEED) is additionally seeded into the Firestore
- * `skills` collection by scripts/seed.ts.
+ * SKILL_SEED is read directly from here by the UI. It is deliberately *not*
+ * mirrored into Firestore — there is no `skills` collection at runtime.
  */
 
 export const ROLES = [

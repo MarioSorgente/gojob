@@ -267,12 +267,12 @@ export async function candidateApply(
   jobId: string,
   candidateId: string,
 ): Promise<ActionResult> {
-  const entry = await getJobCandidate(jobId, candidateId);
+  // The row is missing whenever the candidate wasn't in the job's generated
+  // pool: they registered after the job was posted (the whole point of the
+  // public share link, §20), or their desired roles don't include this one.
+  // Score it on demand, exactly as the employer's invite-from-search does.
+  const entry = await ensureShortlistEntry(jobId, candidateId);
   const now = new Date().toISOString();
-
-  // Candidate applying to a job they weren't shortlisted for is possible in
-  // theory; for the MVP the shortlist row always exists (role-matched pool).
-  if (!entry) throw new Error("Shortlist entry not found");
 
   await shortlistDoc(jobId, candidateId).set(
     {
@@ -300,6 +300,10 @@ export async function candidatePass(
   jobId: string,
   candidateId: string,
 ): Promise<void> {
+  // Same reason as candidateApply. Without this the merge below would create a
+  // partial row with no jobId/score/candidateSummary, which then breaks the
+  // applications list and the employer's shortlist rendering.
+  await ensureShortlistEntry(jobId, candidateId);
   await shortlistDoc(jobId, candidateId).set(
     {
       candidateAction: "passed",
