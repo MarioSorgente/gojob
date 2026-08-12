@@ -25,7 +25,13 @@ const OPTIONS: {
   },
 ];
 
-export function RoleSelect({ preselect }: { preselect?: string }) {
+export function RoleSelect({
+  preselect,
+  next,
+}: {
+  preselect?: string;
+  next?: string;
+}) {
   const [selected, setSelected] = useState<UserRole | null>(
     preselect === "employer" || preselect === "candidate" ? preselect : null,
   );
@@ -33,7 +39,7 @@ export function RoleSelect({ preselect }: { preselect?: string }) {
 
   function choose(role: UserRole) {
     setSelected(role);
-    startTransition(() => setRoleAction(role));
+    startTransition(() => setRoleAction(role, next));
   }
 
   return (

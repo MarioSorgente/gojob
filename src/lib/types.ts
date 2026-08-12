@@ -110,6 +110,8 @@ export interface CandidateProfile {
   experiences: Experience[];
   profileStrength: number; // 0..100
   verification: CandidateVerification;
+  /** Storage path of the uploaded ID document, when submitted (scope §5). */
+  idDocumentPath?: string | null;
   createdAt: string;
   updatedAt: string;
 }

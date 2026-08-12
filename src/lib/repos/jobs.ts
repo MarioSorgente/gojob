@@ -2,6 +2,7 @@ import "server-only";
 import { adminDb } from "../firebase/admin";
 import { COLLECTIONS } from "../collections";
 import { computeMatch } from "../matching";
+import { jobMatchesFilters, type JobFilters } from "../search";
 import {
   listCandidatesForRole,
   listAllCandidates,
@@ -109,6 +110,21 @@ export async function recommendedJobsForCandidate(
 ): Promise<JobRecommendation[]> {
   const jobs = await listLiveJobs();
   return jobs
+    .map((job) => ({ job, ...computeMatch(job, candidate) }))
+    .sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Candidate job search (scope §19): live jobs narrowed by filters, still ranked
+ * by match score so the most relevant sit at the top.
+ */
+export async function searchJobsForCandidate(
+  candidate: CandidateProfile,
+  filters: JobFilters,
+): Promise<JobRecommendation[]> {
+  const jobs = await listLiveJobs();
+  return jobs
+    .filter((job) => jobMatchesFilters(job, filters))
     .map((job) => ({ job, ...computeMatch(job, candidate) }))
     .sort((a, b) => b.score - a.score);
 }

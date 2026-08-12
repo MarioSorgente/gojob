@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth";
 import { getBusinessByOwner } from "@/lib/repos/businesses";
 import { createAndPublishJob, getJob } from "@/lib/repos/jobs";
 import {
+  ensureShortlistEntry,
   markHired,
   setEmployerAction,
   type ActionResult,
@@ -54,6 +55,24 @@ export async function employerActionOnCandidate(
   const user = await requireRole("employer");
   await assertOwnsJob(jobId, user.uid);
   const res = await setEmployerAction(jobId, candidateId, action);
+  revalidatePath(`/employer/jobs/${jobId}`);
+  revalidatePath("/employer/matches");
+  return res;
+}
+
+/**
+ * Invite a candidate discovered through Find Candidates (§18). Creates the
+ * shortlist row first if this candidate wasn't in the job's generated pool.
+ */
+export async function inviteFromSearchAction(
+  jobId: string,
+  candidateId: string,
+): Promise<ActionResult> {
+  const user = await requireRole("employer");
+  await assertOwnsJob(jobId, user.uid);
+  await ensureShortlistEntry(jobId, candidateId);
+  const res = await setEmployerAction(jobId, candidateId, "invited");
+  revalidatePath("/employer/candidates");
   revalidatePath(`/employer/jobs/${jobId}`);
   revalidatePath("/employer/matches");
   return res;

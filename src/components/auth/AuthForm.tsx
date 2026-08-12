@@ -19,8 +19,17 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
   const params = useSearchParams();
   const role = params.get("role");
-  const next =
-    params.get("next") || (role ? `/onboarding?role=${role}` : "/onboarding");
+  const nextParam = params.get("next");
+
+  // Where to go after auth. A `next` (e.g. from a shared job link) is carried
+  // through onboarding so the application continues where it left off (§20).
+  const onboardingQuery = new URLSearchParams();
+  if (role) onboardingQuery.set("role", role);
+  if (nextParam) onboardingQuery.set("next", nextParam);
+  const query = onboardingQuery.toString();
+  const next = mode === "register" || role || nextParam
+    ? `/onboarding${query ? `?${query}` : ""}`
+    : "/onboarding";
 
   const [method, setMethod] = useState<Method>("email");
   const [busy, setBusy] = useState(false);

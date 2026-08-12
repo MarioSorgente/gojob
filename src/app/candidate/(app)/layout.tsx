@@ -16,8 +16,8 @@ export default async function CandidateAppLayout({
 
   const invites = await listCandidateInvitations(user.uid);
   const items = [
-    { href: "/candidate", label: "Jobs", icon: "🧭" },
-    { href: "/candidate/applications", label: "Applied", icon: "📄" },
+    { href: "/candidate", label: "For you", icon: "🧭" },
+    { href: "/candidate/search", label: "Search", icon: "🔍" },
     {
       href: "/candidate/invitations",
       label: "Invites",

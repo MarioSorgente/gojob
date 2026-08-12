@@ -370,6 +370,15 @@ const OTHER_CANDIDATES: Omit<CandidateSeed, "uid">[] = [
 async function main() {
   console.log(`Seeding project "${PROJECT_ID}" (${PROD ? "PRODUCTION" : "emulator"})…`);
 
+  // --- Admin ---
+  const adminUid = await ensureAuthUser("admin@gojob.demo", "GoJob Admin");
+  await writeUser(adminUid, {
+    email: "admin@gojob.demo",
+    phone: null,
+    role: "admin",
+    displayName: "GoJob Admin",
+  });
+
   // --- Employer + business ---
   const employerUid = await ensureAuthUser("owner@milkandmadu.demo", "Milk & Madu Owner");
   await writeUser(employerUid, {
@@ -466,6 +475,7 @@ async function main() {
   console.log("\nDemo logins (password: demo1234):");
   console.log("  Employer:  owner@milkandmadu.demo");
   console.log("  Candidate: ayu@gojob.demo");
+  console.log("  Admin:     admin@gojob.demo  → /admin");
   console.log("\nNext: log in as the employer and post a Barista job to see the pool.");
 }
 

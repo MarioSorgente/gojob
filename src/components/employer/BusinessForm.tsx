@@ -1,20 +1,33 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { createBusinessAction } from "@/app/employer/onboarding/actions";
+import { updateBusinessAction } from "@/app/employer/business-actions";
 import { AREAS, BUSINESS_CATEGORIES } from "@/lib/taxonomy";
 import type { BusinessOnboardingInput } from "@/lib/forms";
 import { Button, Field, Input, Select, Textarea } from "@/components/ui";
+import { useToast } from "@/components/Toast";
 
-export function BusinessForm() {
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState<string>(BUSINESS_CATEGORIES[0]);
-  const [area, setArea] = useState<string>(AREAS[0]);
-  const [address, setAddress] = useState("");
-  const [instagram, setInstagram] = useState("");
-  const [website, setWebsite] = useState("");
-  const [googleMapsUrl, setGoogleMapsUrl] = useState("");
-  const [description, setDescription] = useState("");
+export function BusinessForm({
+  mode = "create",
+  defaults,
+}: {
+  mode?: "create" | "edit";
+  defaults?: Partial<BusinessOnboardingInput>;
+}) {
+  const router = useRouter();
+  const { show } = useToast();
+  const [name, setName] = useState(defaults?.name ?? "");
+  const [category, setCategory] = useState<string>(
+    defaults?.category ?? BUSINESS_CATEGORIES[0],
+  );
+  const [area, setArea] = useState<string>(defaults?.area ?? AREAS[0]);
+  const [address, setAddress] = useState(defaults?.address ?? "");
+  const [instagram, setInstagram] = useState(defaults?.instagram ?? "");
+  const [website, setWebsite] = useState(defaults?.website ?? "");
+  const [googleMapsUrl, setGoogleMapsUrl] = useState(defaults?.googleMapsUrl ?? "");
+  const [description, setDescription] = useState(defaults?.description ?? "");
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -35,13 +48,26 @@ export function BusinessForm() {
       googleMapsUrl: googleMapsUrl || null,
       description,
     };
-    start(() => createBusinessAction(payload));
+    start(async () => {
+      if (mode === "edit") {
+        await updateBusinessAction(payload);
+        show("Venue updated");
+        router.push("/employer/business");
+      } else {
+        await createBusinessAction(payload);
+      }
+    });
   }
 
   return (
     <form onSubmit={submit} className="space-y-3">
       <Field label="Business name">
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Milk & Madu" required />
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Milk & Madu"
+          required
+        />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Category">
@@ -60,17 +86,33 @@ export function BusinessForm() {
         </Field>
       </div>
       <Field label="Address">
-        <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Jl. Pantai Berawa No.52" />
+        <Input
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder="Jl. Pantai Berawa No.52"
+        />
       </Field>
       <Field label="Google Maps link" hint="Adding this verifies your business ✓">
-        <Input value={googleMapsUrl} onChange={(e) => setGoogleMapsUrl(e.target.value)} placeholder="https://maps.app.goo.gl/…" />
+        <Input
+          value={googleMapsUrl}
+          onChange={(e) => setGoogleMapsUrl(e.target.value)}
+          placeholder="https://maps.app.goo.gl/…"
+        />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Instagram">
-          <Input value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@yourvenue" />
+          <Input
+            value={instagram}
+            onChange={(e) => setInstagram(e.target.value)}
+            placeholder="@yourvenue"
+          />
         </Field>
         <Field label="Website">
-          <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" />
+          <Input
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            placeholder="https://…"
+          />
         </Field>
       </div>
       <Field label="Description">
@@ -81,10 +123,16 @@ export function BusinessForm() {
         />
       </Field>
 
-      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {error && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
 
       <Button type="submit" size="lg" className="w-full" disabled={pending}>
-        {pending ? "Creating…" : "Create business"}
+        {pending
+          ? "Saving…"
+          : mode === "edit"
+            ? "Save changes"
+            : "Create business"}
       </Button>
     </form>
   );

@@ -5,10 +5,14 @@ import { randomUUID } from "node:crypto";
 import { getSessionUser } from "@/lib/auth";
 import { markOnboardingComplete } from "@/lib/repos/users";
 import { setCandidateVerification, upsertCandidate } from "@/lib/repos/candidates";
+import { safeNextPath } from "@/lib/nextPath";
 import type { CandidateOnboardingInput } from "@/lib/forms";
 import type { Experience, SkillRef } from "@/lib/types";
 
-export async function saveCandidateProfile(input: CandidateOnboardingInput) {
+export async function saveCandidateProfile(
+  input: CandidateOnboardingInput,
+  next?: string,
+) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
@@ -53,5 +57,6 @@ export async function saveCandidateProfile(input: CandidateOnboardingInput) {
   }
 
   await markOnboardingComplete(user.uid);
-  redirect("/candidate");
+  // Continue an in-flight application from a shared job link (scope §20).
+  redirect(safeNextPath(next, "/candidate"));
 }

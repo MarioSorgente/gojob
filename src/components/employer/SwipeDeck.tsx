@@ -7,7 +7,6 @@ import type { CandidateSummary } from "@/lib/types";
 import { CandidateCard } from "@/components/cards/CandidateCard";
 import { MatchCelebration } from "@/components/MatchCelebration";
 import { Button, EmptyState } from "@/components/ui";
-import { cn } from "@/lib/cn";
 
 export interface DeckCandidate {
   candidateId: string;
@@ -29,6 +28,9 @@ export function SwipeDeck({
   const [matchHref, setMatchHref] = useState<string | null>(null);
   const [matchName, setMatchName] = useState("");
   const [drag, setDrag] = useState(0);
+  // `dragging` mirrors the ref in state because render needs it (to disable the
+  // snap-back transition mid-drag) and refs must not be read during render.
+  const [dragging, setDragging] = useState(false);
   const startX = useRef<number | null>(null);
 
   const current = candidates[index];
@@ -49,6 +51,7 @@ export function SwipeDeck({
 
   function onPointerDown(e: React.PointerEvent) {
     startX.current = e.clientX;
+    setDragging(true);
   }
   function onPointerMove(e: React.PointerEvent) {
     if (startX.current !== null) setDrag(e.clientX - startX.current);
@@ -57,6 +60,7 @@ export function SwipeDeck({
     if (startX.current === null) return;
     const dx = drag;
     startX.current = null;
+    setDragging(false);
     if (dx > 120) act("invited");
     else if (dx < -120) act("passed");
     else setDrag(0);
@@ -94,7 +98,7 @@ export function SwipeDeck({
         className="touch-none select-none"
         style={{
           transform: `translateX(${drag}px) rotate(${rotate}deg)`,
-          transition: startX.current === null ? "transform 0.2s" : "none",
+          transition: dragging ? "none" : "transform 0.2s",
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
