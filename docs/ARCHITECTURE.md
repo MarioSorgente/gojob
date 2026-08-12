@@ -161,8 +161,10 @@ private keys, which is the single most common Vercel paste error.
 
 ## Why the production build uses webpack, not Turbopack
 
-`npm run build` runs `next build --webpack`. This is a workaround, not a
-preference — remove it once the upstream Turbopack bug is fixed.
+`npm run build` runs `next build --webpack`, and `vercel.json` pins the same
+command explicitly so the fix doesn't depend on the host preferring the
+package.json script over its own framework default. This is a workaround, not a
+preference — remove both once the upstream Turbopack bug is fixed.
 
 Next 16 builds with Turbopack by default, and Turbopack loads server-external
 packages (`firebase-admin` is on Next's default externals list) through its own
