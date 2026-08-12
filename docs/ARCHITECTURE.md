@@ -159,39 +159,64 @@ private keys, which is the single most common Vercel paste error.
 
 ---
 
+## Why `jose` is pinned to v5
+
+`package.json` carries an override:
+
+```json
+"overrides": { "jose": "^5.10.0" }
+```
+
+Removing it takes production down completely. Every server route that touches
+Firebase — login, both dashboards, admin, the session endpoint — fails with:
+
+```
+ERR_REQUIRE_ESM: require() of ES Module …/jose/dist/webapi/index.js
+  from …/jwks-rsa/src/utils.js not supported
+```
+
+The chain is `firebase-admin` → `jwks-rsa` (CommonJS, calls `require('jose')`) →
+`jose@6`, which is **ESM-only**: `"type": "module"`, and its `exports` map has no
+`require` condition at all. jose v5 ships a real CJS build
+(`dist/node/cjs/index.js`) behind a `require` condition, which is the entire
+difference.
+
+**Why this hides in development.** Node 22.12+/24 natively supports `require()`
+of ESM that has no top-level await, so on a normal Node 24 the whole chain loads
+happily — locally, in `next dev`, and in `next build` + `next start`. Vercel's
+Node runtime patches `Module._load`, and that patched loader does not honour
+native require(esm). So the failure appears *only* in the deployed lambda.
+
+Reproduce the production condition locally with the flag that disables the same
+feature:
+
+```bash
+node --no-experimental-require-module -e "require('firebase-admin/auth')"
+```
+
+`src/lib/firebase/adminDeps.test.ts` runs exactly that in CI, so a transitive
+bump that reintroduces an ESM-only jose fails a test instead of a deploy.
+
+**Is the override safe?** `jose` has exactly one dependent in the tree
+(`jwks-rsa`), which uses four stable APIs: `decodeJwt`, `decodeProtectedHeader`,
+`importJWK`, `exportSPKI`. All four exist in v5 with the same signatures and are
+verified working. The override is a semver lie — jwks-rsa asks for `^6.1.3` —
+so drop it once `jwks-rsa` either switches to `import()` or ships a CJS-safe
+jose. There is no newer `jwks-rsa`: 4.1.0 is latest and 4.0.x pins jose ^6 too.
+
 ## Why the production build uses webpack, not Turbopack
 
-`npm run build` runs `next build --webpack`, and `vercel.json` pins the same
-command explicitly so the fix doesn't depend on the host preferring the
-package.json script over its own framework default. This is a workaround, not a
-preference — remove both once the upstream Turbopack bug is fixed.
+`npm run build` runs `next build --webpack`, pinned again in `vercel.json` so it
+can't depend on the host preferring the package.json script over its own
+framework default.
 
-Next 16 builds with Turbopack by default, and Turbopack loads server-external
-packages (`firebase-admin` is on Next's default externals list) through its own
-CJS shim rather than letting Node resolve them. On Vercel that shim fails:
-
-```
-Failed to load external module firebase-admin-a14c8a5423a75469/auth:
-  ERR_REQUIRE_ESM: require() of ES Module …/jose/dist/webapi/index.js
-  from …/jwks-rsa/src/utils.js not supported
-  at Context.externalImport (.next/server/chunks/ssr/[turbopack]_runtime.js)
-```
-
-The chain is `firebase-admin` → `jwks-rsa` (CJS, `require('jose')`) → `jose@6`,
-which is pure ESM: `"type": "module"`, and its `exports` map has no `require`
-condition.
-
-This is **not** a dependency problem. Node 22.12+/24 natively supports
-`require()` of ESM without top-level await, and on plain Node 24
-`require('firebase-admin/auth')` succeeds. Only Turbopack's shim fails, and only
-in the Vercel lambda — a local `next build` + `next start` with Turbopack serves
-these routes fine, which is why this reached production undetected. It took down
-every server route that touches Firebase: login, both dashboards, admin, all of
-it. Webpack emits a plain `require()` that Node executes itself, so the native
-`require(esm)` support applies and the chain loads.
-
-See vercel/next.js#87737 and #87686 for the wider class of Turbopack
-external-module failures.
+Honest status: this was introduced as a fix for the ERR_REQUIRE_ESM above and
+**did not fix it** — the same error came back from Vercel's own loader
+(`/opt/rust/nodejs.js`) once Turbopack's shim was out of the picture. The jose
+override is the actual fix. Webpack is kept only because Turbopack has a
+documented class of external-module failures (vercel/next.js#87737, #87686) and
+this deployment is known-good on webpack. It is a candidate for removal once
+production has been verified stable — try it deliberately, not incidentally.
 
 ---
 
