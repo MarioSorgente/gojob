@@ -14,6 +14,7 @@
 import type { Auth } from "firebase-admin/auth";
 import type { Firestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../collections";
+import { chunk } from "../chunk";
 import { computeMatch } from "../matching";
 import type {
   Business,
@@ -127,44 +128,58 @@ async function writeJobWithShortlist(
   job: Omit<Job, "id" | "createdAt">,
   candidates: CandidateProfile[],
 ): Promise<number> {
-  const fullJob: Job = { id: jobId, createdAt: now(), ...job };
-  await db.collection(COLLECTIONS.jobs).doc(jobId).set(fullJob);
-
   const pool = candidates.filter((c) =>
     c.roles.some((r) => r.toLowerCase() === job.role.toLowerCase()),
   );
 
-  const batch = db.batch();
-  for (const c of pool) {
-    const { score, breakdown, reasons } = computeMatch(fullJob, c);
-    const applied =
-      jobId === PRE_APPLIED_JOB_ID && PRE_APPLIED_UIDS.includes(c.userId);
-    const entry: JobCandidate = {
-      jobId,
-      candidateId: c.userId,
-      businessId: job.businessId,
-      score,
-      breakdown,
-      reasons,
-      employerAction: "none",
-      candidateAction: applied ? "applied" : "none",
-      stage: applied ? "applied" : "recommended",
-      matchId: null,
-      conversationId: null,
-      candidateSummary: toSummary(c),
-      createdAt: now(),
-      updatedAt: now(),
-    };
-    batch.set(
-      db
-        .collection(COLLECTIONS.jobs)
-        .doc(jobId)
-        .collection(COLLECTIONS.shortlist)
-        .doc(c.userId),
-      entry,
-    );
+  // Seeded shortlists are complete the moment they're written, so mark them
+  // ready — otherwise the job page would poll for a generation that never runs.
+  const fullJob: Job = {
+    id: jobId,
+    createdAt: now(),
+    ...job,
+    shortlistStatus: "ready",
+    shortlistCount: pool.length,
+    shortlistUpdatedAt: now(),
+  };
+  await db.collection(COLLECTIONS.jobs).doc(jobId).set(fullJob);
+
+  // Chunked for the same reason as repos/jobs.ts#generateShortlist: batches
+  // cap at 500 writes. The demo pool is far smaller, but the two paths should
+  // not differ in a way that only shows up at scale.
+  for (const group of chunk(pool)) {
+    const batch = db.batch();
+    for (const c of group) {
+      const { score, breakdown, reasons } = computeMatch(fullJob, c);
+      const applied =
+        jobId === PRE_APPLIED_JOB_ID && PRE_APPLIED_UIDS.includes(c.userId);
+      const entry: JobCandidate = {
+        jobId,
+        candidateId: c.userId,
+        businessId: job.businessId,
+        score,
+        breakdown,
+        reasons,
+        employerAction: "none",
+        candidateAction: applied ? "applied" : "none",
+        stage: applied ? "applied" : "recommended",
+        matchId: null,
+        conversationId: null,
+        candidateSummary: toSummary(c),
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      batch.set(
+        db
+          .collection(COLLECTIONS.jobs)
+          .doc(jobId)
+          .collection(COLLECTIONS.shortlist)
+          .doc(c.userId),
+        entry,
+      );
+    }
+    await batch.commit();
   }
-  await batch.commit();
   return pool.length;
 }
 

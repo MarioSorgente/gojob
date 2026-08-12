@@ -1,16 +1,16 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { getCandidate } from "@/lib/repos/candidates";
-import { recommendedJobsForCandidate } from "@/lib/repos/jobs";
-import { JobCard } from "@/components/cards/JobCard";
-import { EmptyState, PageTitle } from "@/components/ui";
+import { recommendedJobsPage } from "@/lib/repos/jobs";
+import { JobResults } from "@/components/candidate/JobResults";
+import { PageTitle } from "@/components/ui";
 
 export default async function CandidateHome() {
   const user = await requireRole("candidate");
   const candidate = await getCandidate(user.uid);
   if (!candidate) redirect("/candidate/onboarding");
 
-  const recs = await recommendedJobsForCandidate(candidate);
+  const firstPage = await recommendedJobsPage(candidate, {}, null);
 
   return (
     <>
@@ -18,25 +18,13 @@ export default async function CandidateHome() {
         title={`Hi ${candidate.firstName || "there"} 👋`}
         subtitle="Jobs recommended for you"
       />
-      {recs.length === 0 ? (
-        <EmptyState
-          icon="🔎"
-          title="No open jobs yet"
-          hint="Check back soon — new hospitality jobs are posted every day."
-        />
-      ) : (
-        <div className="space-y-3">
-          {recs.map((r) => (
-            <JobCard
-              key={r.job.id}
-              job={r.job}
-              score={r.score}
-              reasons={r.reasons}
-              href={`/candidate/jobs/${r.job.id}`}
-            />
-          ))}
-        </div>
-      )}
+      <JobResults
+        initialItems={firstPage.items}
+        initialCursor={firstPage.nextCursor}
+        filters={{}}
+        emptyTitle="No open jobs yet"
+        emptyHint="Check back soon — new hospitality jobs are posted every day."
+      />
     </>
   );
 }

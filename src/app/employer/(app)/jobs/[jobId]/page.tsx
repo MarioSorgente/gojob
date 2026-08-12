@@ -10,6 +10,7 @@ import { SwipeDeck, type DeckCandidate } from "@/components/employer/SwipeDeck";
 import { ApplicantRow } from "@/components/employer/ApplicantRow";
 import { InviteButton } from "@/components/employer/InviteButton";
 import { HireButton } from "@/components/employer/HireButton";
+import { ShortlistProgress } from "@/components/employer/ShortlistProgress";
 
 export default async function EmployerJobDetail({
   params,
@@ -27,6 +28,11 @@ export default async function EmployerJobDetail({
   if (!job || job.ownerId !== user.uid) notFound();
 
   const shortlist = await getShortlist(jobId);
+
+  // Jobs created before shortlistStatus existed have no value; treat those as
+  // finished rather than leaving them spinning forever.
+  const shortlistPending = job.shortlistStatus === "pending";
+  const shortlistFailed = job.shortlistStatus === "failed";
 
   const deck: DeckCandidate[] = shortlist
     .filter(
@@ -61,8 +67,9 @@ export default async function EmployerJobDetail({
         <Card className="border-brand bg-brand-soft p-4">
           <p className="font-bold text-brand-dark">🎉 Your job is live!</p>
           <p className="text-sm text-brand-dark">
-            {shortlist.length} potential candidate{shortlist.length === 1 ? "" : "s"}{" "}
-            match this position.
+            {shortlistPending
+              ? "We're finding candidates who match this position."
+              : `${shortlist.length} potential candidate${shortlist.length === 1 ? "" : "s"} match this position.`}
           </p>
         </Card>
       )}
@@ -89,7 +96,9 @@ export default async function EmployerJobDetail({
         <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-muted">
           Recommended candidates
         </h2>
-        {deck.length === 0 ? (
+        {shortlistPending || shortlistFailed ? (
+          <ShortlistProgress failed={shortlistFailed} />
+        ) : deck.length === 0 ? (
           <EmptyState
             icon="✅"
             title="No new candidates to review"

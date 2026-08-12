@@ -149,6 +149,16 @@ export interface JobLanguage {
 
 export type JobStatus = "draft" | "live" | "closed";
 
+/**
+ * Whether a job's shortlist has finished generating. Scoring the pool happens
+ * off the request that publishes the job, so the UI needs to know when the
+ * results are complete rather than merely empty.
+ *
+ * Optional on Job: documents written before this existed have no value, and
+ * are treated as "ready".
+ */
+export type ShortlistStatus = "pending" | "ready" | "failed";
+
 export interface Job {
   id: string;
   businessId: string;
@@ -168,6 +178,10 @@ export interface Job {
   description: string;
   status: JobStatus;
   createdAt: string;
+  shortlistStatus?: ShortlistStatus;
+  /** Size of the generated shortlist, once known. */
+  shortlistCount?: number;
+  shortlistUpdatedAt?: string;
 }
 
 // ---------------------------------------------------------------------------

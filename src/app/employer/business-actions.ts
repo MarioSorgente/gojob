@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { getBusinessByOwner, updateBusiness } from "@/lib/repos/businesses";
+import { assertOwnedStorageReference } from "@/lib/storagePaths";
 import type { BusinessOnboardingInput } from "@/lib/forms";
 
 async function ownedBusiness(uid: string) {
@@ -33,6 +34,10 @@ export async function updateBusinessAction(input: BusinessOnboardingInput) {
 export async function updateBusinessLogoAction(url: string) {
   const user = await requireRole("employer");
   const business = await ownedBusiness(user.uid);
+  // Logos upload to users/{uid}/public/, so the owner's uid is the scope here —
+  // see the note in candidate/profile-actions.ts on why the client's URL can't
+  // be trusted as given.
+  assertOwnedStorageReference(url, user.uid, "public");
   await updateBusiness(business.id, { logo: url });
   revalidatePath("/employer/business");
 }

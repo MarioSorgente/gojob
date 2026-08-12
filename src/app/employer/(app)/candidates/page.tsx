@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { getBusinessByOwner } from "@/lib/repos/businesses";
-import { searchCandidates, toCandidateSummary } from "@/lib/repos/candidates";
+import { searchCandidatesPage, toCandidateSummary } from "@/lib/repos/candidates";
 import { listJobsByBusiness } from "@/lib/repos/jobs";
 import {
   AREAS,
@@ -12,10 +12,9 @@ import {
   PROFICIENCY_LEVELS,
   ROLES,
 } from "@/lib/taxonomy";
-import { EmptyState, PageTitle } from "@/components/ui";
+import { PageTitle } from "@/components/ui";
 import { FilterBar, type FilterField } from "@/components/FilterBar";
-import { ApplicantRow } from "@/components/employer/ApplicantRow";
-import { InviteToJobButton } from "@/components/employer/InviteToJobButton";
+import { CandidateResults } from "@/components/employer/CandidateResults";
 
 const FIELDS: FilterField[] = [
   { name: "role", label: "Role", type: "select", options: ROLES },
@@ -45,7 +44,7 @@ export default async function FindCandidatesPage({
     return v ? Number(v) || undefined : undefined;
   };
 
-  const candidates = await searchCandidates({
+  const filters = {
     role: one("role"),
     area: one("area"),
     minExperience: num("minExp"),
@@ -56,7 +55,9 @@ export default async function FindCandidatesPage({
     minLanguageLevel: one("level"),
     verifiedOnly: one("verified") === "1",
     query: one("q"),
-  });
+  };
+
+  const firstPage = await searchCandidatesPage(filters, null);
 
   const jobs = (await listJobsByBusiness(business.id))
     .filter((j) => j.status === "live")
@@ -79,42 +80,17 @@ export default async function FindCandidatesPage({
         </p>
       )}
 
-      <p className="mb-2 text-sm text-muted">
-        {candidates.length} candidate{candidates.length === 1 ? "" : "s"}
-      </p>
-
-      {candidates.length === 0 ? (
-        <EmptyState
-          icon="🔍"
-          title="No candidates match those filters"
-          hint="Try widening the area or lowering the experience requirement."
-        />
-      ) : (
-        <div className="space-y-2">
-          {candidates.map((c) => (
-            <Link
-              key={c.userId}
-              href={`/employer/candidates/${c.userId}`}
-              className="block"
-            >
-              <ApplicantRow
-                summary={toCandidateSummary(c)}
-                score={c.profileStrength}
-                scoreLabel="profile"
-                right={
-                  <div onClick={(e) => e.preventDefault()}>
-                    <InviteToJobButton
-                      candidateId={c.userId}
-                      name={c.firstName}
-                      jobs={jobs}
-                    />
-                  </div>
-                }
-              />
-            </Link>
-          ))}
-        </div>
-      )}
+      <CandidateResults
+        initialItems={firstPage.items.map((c) => ({
+          userId: c.userId,
+          firstName: c.firstName,
+          profileStrength: c.profileStrength,
+          summary: toCandidateSummary(c),
+        }))}
+        initialCursor={firstPage.nextCursor}
+        filters={filters}
+        jobs={jobs}
+      />
     </>
   );
 }
