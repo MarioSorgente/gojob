@@ -84,14 +84,56 @@ npm run lint        # eslint
 ## Deploying to Vercel (with a real Firebase project)
 
 1. Create a Firebase project; enable **Authentication** (Email/Password, Google,
-   Phone), **Firestore**, and **Storage**.
-2. In Vercel, set environment variables from `.env.example`:
-   - `NEXT_PUBLIC_FIREBASE_*` — your web app config
-   - `NEXT_PUBLIC_USE_FIREBASE_EMULATOR=0`
-   - `FIREBASE_SERVICE_ACCOUNT_KEY` — base64-encoded service-account JSON (for
-     the Admin SDK), and **remove** the `*_EMULATOR_HOST` variables
+   Phone), **Firestore**, and **Storage**. Under Authentication → Settings →
+   **Authorized domains**, add your Vercel domain(s).
+2. In Vercel → Settings → Environment Variables, add (Production, and Preview if
+   used):
+
+   **Client (from Firebase → Project settings → Your apps → SDK config):**
+   - `NEXT_PUBLIC_FIREBASE_API_KEY`
+   - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+   - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+   - `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+   - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+   - `NEXT_PUBLIC_FIREBASE_APP_ID`
+   - `NEXT_PUBLIC_USE_FIREBASE_EMULATOR` = `0`
+
+   **Server / Admin SDK (from Project settings → Service accounts → Generate new
+   private key). Recommended: three separate variables:**
+   - `FIREBASE_PROJECT_ID`
+   - `FIREBASE_CLIENT_EMAIL`
+   - `FIREBASE_PRIVATE_KEY` (paste the full key incl. BEGIN/END lines; literal
+     `\n` are handled)
+
+   Do **not** set any `*_EMULATOR_HOST` variables in production.
 3. Deploy. Push the Firestore rules/indexes with
    `firebase deploy --only firestore,storage` when you're ready.
+
+## Testing on the live site without real users
+
+Your production Firestore starts empty, so post-a-job shows zero candidates.
+Seed the same demo data (Milk & Madu + Ayu + 13 candidates + a live job) into
+your **real** project:
+
+1. Download a service-account key (Project settings → Service accounts →
+   Generate new private key). Save it as `serviceAccount.json` in the project
+   root — it's gitignored.
+2. In `.env.local`, add: `GOOGLE_APPLICATION_CREDENTIALS=./serviceAccount.json`
+3. Run:
+
+   ```bash
+   npm run seed:prod
+   ```
+
+   (It refuses to run unless it finds real credentials.) Then on the deployed
+   site, open two browsers (or one + an incognito window) and log in as the
+   employer and the candidate — password `demo1234`:
+   - Employer `owner@milkandmadu.demo` → post a Barista job → invite Ayu
+   - Candidate `ayu@gojob.demo` → accept the invite → chat → schedule interview
+   - Employer → Mark as Hired
+
+To wipe and reseed, delete the `candidates`, `businesses`, `jobs`, `users`
+collections in the Firestore console and run `npm run seed:prod` again.
 
 ## Project structure
 
