@@ -1,0 +1,49 @@
+rules_version = '2';
+
+// GoJob Firestore security rules.
+//
+// All privileged reads/writes go through the server (Admin SDK), which bypasses
+// these rules. The client SDK is only trusted for: reading your own user &
+// candidate docs, and the realtime chat between the two matched participants.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isParticipant(parts) {
+      return signedIn() && request.auth.uid in parts;
+    }
+
+    // A user can read (not write) their own user document.
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+    }
+
+    // A candidate can read their own profile. Employers view candidates via the
+    // server, so no broad client read here.
+    match /candidates/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Realtime chat: only the two participants can read/update the conversation
+    // and read/create its messages. Everything is created server-side first.
+    match /conversations/{cid} {
+      allow read, update: if isParticipant(resource.data.participants);
+
+      match /messages/{mid} {
+        allow read: if isParticipant(
+          get(/databases/$(database)/documents/conversations/$(cid)).data.participants
+        );
+        allow create: if isParticipant(
+                        get(/databases/$(database)/documents/conversations/$(cid)).data.participants
+                      )
+                      && request.resource.data.senderId == request.auth.uid;
+      }
+    }
+
+    // Deny everything else on the client (server uses the Admin SDK).
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
