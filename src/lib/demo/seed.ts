@@ -234,6 +234,7 @@ async function writeDemoChat(
     // give their side a visible unread badge to test against.
     unread: { [employerUid]: 0, [candidate.userId]: 1 },
     createdAt,
+    activityAt: last.createdAt,
   };
   await db.collection(COLLECTIONS.conversations).doc(conversationId).set(conversation);
 

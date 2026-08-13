@@ -298,6 +298,7 @@ async function createMatch(
       lastMessageAt: null,
       unread: { [job.ownerId]: 0, [candidateId]: 0 },
       createdAt: now,
+      activityAt: now,
     };
 
     transaction.set(matchRef, match);

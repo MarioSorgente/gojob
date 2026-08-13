@@ -259,6 +259,8 @@ export interface Conversation {
   lastMessageAt: string | null;
   unread: Record<string, number>; // uid -> unread count
   createdAt: string;
+  /** Creation time initially; advances whenever a message is sent. */
+  activityAt: string;
 }
 
 export interface Message {
