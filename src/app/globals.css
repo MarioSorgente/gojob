@@ -25,8 +25,9 @@
   --color-accent: var(--accent);
   --color-success: var(--success);
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji";
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
@@ -48,4 +49,36 @@ body {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Chat owns the bounded area between the mobile shell bars. Unlike ordinary
+   pages it must not add document scroll or inherit the standard page gutter. */
+.app-shell {
+  --mobile-nav-height: 3.75rem;
+}
+
+.app-shell:has(> .app-shell-content > [data-chat-workspace]) {
+  display: flex;
+  height: 100dvh;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-shell-content:has(> [data-chat-workspace]) {
+  min-height: 0;
+  flex: 1;
+  max-width: 28rem;
+  padding: 0 0 calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 48rem) {
+  .app-shell:has(> .app-shell-content > [data-chat-workspace]) {
+    display: block;
+  }
+
+  .app-shell-content:has(> [data-chat-workspace]) {
+    height: 100dvh;
+    max-width: none;
+    padding: 0;
+  }
 }

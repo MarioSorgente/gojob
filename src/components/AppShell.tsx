@@ -24,7 +24,7 @@ export function AppShell({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-dvh md:pl-60">
+    <div className="app-shell min-h-dvh md:pl-60">
       <SideNav items={items} footer={<LogoutButton />} />
 
       {/* The top bar is redundant once the sidebar carries the logo and sign-out. */}
@@ -33,7 +33,7 @@ export function AppShell({
       </div>
 
       {/* pb-20 clears the fixed bottom bar on phones; the sidebar needs none. */}
-      <main className="mx-auto w-full max-w-md px-5 py-5 pb-20 md:max-w-5xl md:px-8 md:py-8 md:pb-8">
+      <main className="app-shell-content mx-auto w-full max-w-md px-5 py-5 pb-20 md:max-w-5xl md:px-8 md:py-8 md:pb-8">
         {children}
       </main>
 
