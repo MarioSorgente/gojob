@@ -31,6 +31,7 @@ service cloud.firestore {
     // ownership). Clients may only create a strictly shaped message.
     match /conversations/{cid} {
       allow read: if isParticipant(resource.data.participants);
+      allow create, update, delete: if false;
 
       match /messages/{mid} {
         allow read: if isParticipant(
@@ -54,6 +55,7 @@ service cloud.firestore {
                       && request.resource.data.body.size() <= 4000
                       && request.resource.data.createdAt is string
                       && request.resource.data.readAt == null;
+        allow update, delete: if false;
       }
     }
 
