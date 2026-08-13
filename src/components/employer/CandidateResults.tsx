@@ -62,7 +62,7 @@ export function CandidateResults({
 
   return (
     <>
-      <div className="space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
+      <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
         {items.map((c) => (
           // Stretched link rather than wrapping the row: a <button> inside an
           // <a> is invalid, and the previous `<div onClick={preventDefault}>`
