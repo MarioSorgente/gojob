@@ -22,6 +22,7 @@ export default async function CandidateHome() {
         initialItems={firstPage.items}
         initialCursor={firstPage.nextCursor}
         filters={{}}
+        label="Recommended jobs"
         emptyTitle="No open jobs yet"
         emptyHint="Check back soon — new hospitality jobs are posted every day."
       />

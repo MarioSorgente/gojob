@@ -34,7 +34,8 @@ export default async function CandidateJobSearch({
   if (!candidate) redirect("/candidate/onboarding");
 
   const sp = await searchParams;
-  const one = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
+  const one = (k: string) =>
+    typeof sp[k] === "string" ? (sp[k] as string) : undefined;
   const minSalaryRaw = one("minSalary");
 
   const filters = {
@@ -50,15 +51,20 @@ export default async function CandidateJobSearch({
   return (
     <>
       <PageTitle title="Search jobs" subtitle="All open jobs, ranked for you" />
-      <FilterBar fields={FIELDS} searchPlaceholder="Search role, venue, area…" />
-
-      <JobResults
-        initialItems={firstPage.items}
-        initialCursor={firstPage.nextCursor}
-        filters={filters}
-        emptyTitle="No jobs match those filters"
-        emptyHint="Try clearing a filter or widening the area."
-      />
+      <section aria-label="Search filters and results">
+        <FilterBar
+          fields={FIELDS}
+          searchPlaceholder="Search role, venue, area…"
+        />
+        <JobResults
+          initialItems={firstPage.items}
+          initialCursor={firstPage.nextCursor}
+          filters={filters}
+          label="Search results"
+          emptyTitle="No jobs match those filters"
+          emptyHint="Try clearing a filter or widening the area."
+        />
+      </section>
     </>
   );
 }

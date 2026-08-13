@@ -24,9 +24,12 @@ export function JobCard({
     // their own click sit above it. Wrapping the card in <Link> instead would
     // put a <button> inside an <a> — invalid markup that also swallows keyboard
     // activation of the inner control.
-    <div className="relative rounded-2xl border border-border bg-surface p-4 shadow-sm transition-all hover:border-brand/40 hover:shadow-md focus-within:ring-2 focus-within:ring-brand/40">
+    <div className="relative h-full rounded-2xl border border-border bg-surface p-4 shadow-sm transition-all hover:border-brand/40 hover:shadow-md focus-within:ring-2 focus-within:ring-brand/40">
       {href && (
-        <Link href={href} className="absolute inset-0 z-0 rounded-2xl outline-none">
+        <Link
+          href={href}
+          className="absolute inset-0 z-0 rounded-2xl outline-none"
+        >
           <span className="sr-only">
             {job.role} at {job.businessName}
           </span>
@@ -34,21 +37,25 @@ export function JobCard({
       )}
 
       <div className="relative flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 max-w-prose">
           <h3 className="font-bold leading-tight">{job.role}</h3>
           <p className="truncate text-sm text-muted">{job.businessName}</p>
         </div>
         {score != null &&
           (breakdown ? (
             <div className="relative z-10 shrink-0">
-              <MatchExplain score={score} breakdown={breakdown} reasons={reasons} />
+              <MatchExplain
+                score={score}
+                breakdown={breakdown}
+                reasons={reasons}
+              />
             </div>
           ) : (
             <MatchPercent score={score} className="shrink-0" />
           ))}
       </div>
 
-      <div className="relative mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+      <div className="relative mt-2 flex max-w-prose flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
         {job.businessVerified ? (
           <Badge tone="green">✓ Verified</Badge>
         ) : (
@@ -59,11 +66,12 @@ export function JobCard({
       </div>
 
       <p className="relative mt-2 font-semibold text-slate-800">
-        💰 {formatSalaryRange(job.salaryType, job.salaryMin, job.salaryMax) || "—"}
+        💰{" "}
+        {formatSalaryRange(job.salaryType, job.salaryMin, job.salaryMax) || "—"}
       </p>
 
       {reasons && reasons.length > 0 && (
-        <div className="relative mt-3">
+        <div className="relative mt-3 max-w-prose">
           <ReasonList reasons={reasons} limit={3} />
         </div>
       )}
