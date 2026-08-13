@@ -72,16 +72,18 @@ export async function sendMessage(
     throw new Error("Not a participant");
   }
 
+  const trimmedBody = body.trim();
+  if (!trimmedBody) throw new Error("Message body is required");
+
   const now = new Date().toISOString();
   const ref = messagesCol(conversationId).doc();
   const message: Omit<Message, "id"> = {
     conversationId,
     senderId,
-    body: body.trim(),
+    body: trimmedBody,
     createdAt: now,
     readAt: null,
   };
-  await ref.set(message);
 
   const recipient = conv.participants.find((p) => p !== senderId);
   const update: Record<string, unknown> = {
@@ -89,7 +91,11 @@ export async function sendMessage(
     lastMessageAt: now,
   };
   if (recipient) update[`unread.${recipient}`] = FieldValue.increment(1);
-  await conversationsCol().doc(conversationId).update(update);
+
+  const batch = adminDb().batch();
+  batch.set(ref, message);
+  batch.update(conversationsCol().doc(conversationId), update);
+  await batch.commit();
 
   return { id: ref.id, ...message };
 }
