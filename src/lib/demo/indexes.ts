@@ -32,6 +32,24 @@ export interface EnsureIndexesResult {
   note: string;
 }
 
+export type IndexHealthStatus = "READY" | "BUILDING" | "MISSING" | "ERROR";
+export type DatabaseIndexState = "HEALTHY" | "DEGRADED" | "UNHEALTHY";
+
+export interface IndexHealthDetail {
+  kind: "composite" | "field";
+  collectionGroup: string;
+  fields: AdminCompositeIndex["fields"];
+  queryScope: AdminCompositeIndex["queryScope"];
+  status: IndexHealthStatus;
+  detail?: string;
+}
+
+export interface IndexHealthResult {
+  projectId: string;
+  databaseState: DatabaseIndexState;
+  indexes: IndexHealthDetail[];
+}
+
 async function accessToken(app: App): Promise<string> {
   // The credential attached to the Admin app already carries the right scopes
   // (cloud-platform / datastore) — no second set of secrets to configure.
@@ -55,6 +73,199 @@ async function post(
     body: JSON.stringify(body),
   });
   return { ok: res.ok, status: res.status, text: await res.text() };
+}
+
+async function getJson(url: string, token: string): Promise<unknown> {
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const text = await res.text();
+  if (!res.ok)
+    throw new Error(`Firestore Admin API ${res.status}: ${text.slice(0, 300)}`);
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error("Firestore Admin API returned malformed JSON");
+  }
+}
+
+type JsonObject = Record<string, unknown>;
+
+function object(value: unknown): JsonObject | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as JsonObject)
+    : null;
+}
+
+function normalizedFields(
+  value: unknown,
+): AdminCompositeIndex["fields"] | null {
+  if (!Array.isArray(value)) return null;
+  const fields: AdminCompositeIndex["fields"] = [];
+  for (const item of value) {
+    const field = object(item);
+    if (!field || typeof field.fieldPath !== "string") return null;
+    // Firestore adds this tiebreaker to deployed composite definitions.
+    if (field.fieldPath === "__name__") continue;
+    if (field.order === "ASCENDING" || field.order === "DESCENDING") {
+      fields.push({ fieldPath: field.fieldPath, order: field.order });
+    } else if (field.arrayConfig === "CONTAINS") {
+      fields.push({ fieldPath: field.fieldPath, arrayConfig: "CONTAINS" });
+    } else return null;
+  }
+  return fields;
+}
+
+function signature(scope: unknown, fields: unknown): string | null {
+  const normalized = normalizedFields(fields);
+  if ((scope !== "COLLECTION" && scope !== "COLLECTION_GROUP") || !normalized)
+    return null;
+  return JSON.stringify({ queryScope: scope, fields: normalized });
+}
+
+function adminState(value: unknown): {
+  status: IndexHealthStatus;
+  detail?: string;
+} {
+  if (value === "READY") return { status: "READY" };
+  if (value === "CREATING") return { status: "BUILDING" };
+  if (typeof value === "string")
+    return { status: "ERROR", detail: `Admin API state: ${value}` };
+  return {
+    status: "ERROR",
+    detail: "Admin API response omitted the index state",
+  };
+}
+
+/** Compare the canonical index file with definitions actually deployed in Firestore. */
+export async function indexHealth(
+  app: App,
+  projectId: string,
+  config?: unknown,
+): Promise<IndexHealthResult> {
+  const required = adminIndexRequests(config);
+  const token = await accessToken(app);
+  const base = `${API}/projects/${projectId}/databases/(default)/collectionGroups`;
+  const results: IndexHealthDetail[] = [];
+
+  const groups = [
+    ...new Set(required.compositeIndexes.map((i) => i.collectionGroup)),
+  ];
+  const deployed = new Map<
+    string,
+    { status: IndexHealthStatus; detail?: string }
+  >();
+  for (const group of groups) {
+    try {
+      let pageToken: string | undefined;
+      do {
+        const url = `${base}/${encodeURIComponent(group)}/indexes${pageToken ? `?pageToken=${encodeURIComponent(pageToken)}` : ""}`;
+        const payload = object(await getJson(url, token));
+        if (
+          !payload ||
+          (payload.indexes !== undefined && !Array.isArray(payload.indexes))
+        )
+          throw new Error(
+            "Firestore Admin API returned a malformed index list",
+          );
+        for (const item of (payload.indexes as unknown[] | undefined) ?? []) {
+          const index = object(item);
+          const key = index && signature(index.queryScope, index.fields);
+          if (!index || !key)
+            throw new Error(
+              "Firestore Admin API returned a malformed index definition",
+            );
+          deployed.set(`${group}:${key}`, adminState(index.state));
+        }
+        if (
+          payload.nextPageToken !== undefined &&
+          typeof payload.nextPageToken !== "string"
+        )
+          throw new Error(
+            "Firestore Admin API returned a malformed page token",
+          );
+        pageToken = payload.nextPageToken as string | undefined;
+      } while (pageToken);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      for (const index of required.compositeIndexes.filter(
+        (i) => i.collectionGroup === group,
+      ))
+        deployed.set(`${group}:${signature(index.queryScope, index.fields)}`, {
+          status: "ERROR",
+          detail,
+        });
+    }
+  }
+
+  for (const index of required.compositeIndexes) {
+    const found = deployed.get(
+      `${index.collectionGroup}:${signature(index.queryScope, index.fields)}`,
+    );
+    results.push({
+      kind: "composite",
+      ...index,
+      ...(found ?? { status: "MISSING" }),
+    });
+  }
+
+  for (const override of required.fieldOverrides) {
+    let payload: JsonObject | null = null;
+    let failure: string | undefined;
+    try {
+      payload = object(
+        await getJson(
+          `${base}/${encodeURIComponent(override.collectionGroup)}/fields/${encodeURIComponent(override.fieldPath)}`,
+          token,
+        ),
+      );
+      if (
+        !payload ||
+        !object(payload.indexConfig) ||
+        !Array.isArray(object(payload.indexConfig)?.indexes)
+      )
+        throw new Error(
+          "Firestore Admin API returned a malformed field configuration",
+        );
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error);
+    }
+    const deployedFields = object(payload?.indexConfig)?.indexes as
+      unknown[] | undefined;
+    for (const requiredIndex of override.indexConfig.indexes) {
+      let state: { status: IndexHealthStatus; detail?: string } = {
+        status: "MISSING",
+      };
+      if (failure) state = { status: "ERROR", detail: failure };
+      else {
+        const match = deployedFields?.find((item) => {
+          const candidate = object(item);
+          return (
+            candidate &&
+            signature(candidate.queryScope, candidate.fields) ===
+              signature(requiredIndex.queryScope, requiredIndex.fields)
+          );
+        });
+        if (match) state = adminState(object(match)?.state);
+      }
+      results.push({
+        kind: "field",
+        collectionGroup: override.collectionGroup,
+        queryScope: requiredIndex.queryScope,
+        fields: requiredIndex.fields,
+        ...state,
+      });
+    }
+  }
+
+  const databaseState: DatabaseIndexState = results.some(
+    (r) => r.status === "ERROR",
+  )
+    ? "UNHEALTHY"
+    : results.every((r) => r.status === "READY")
+      ? "HEALTHY"
+      : "DEGRADED";
+  return { projectId, databaseState, indexes: results };
 }
 
 function describe(index: AdminCompositeIndex): string {
