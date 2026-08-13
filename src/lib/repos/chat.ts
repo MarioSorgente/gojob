@@ -30,6 +30,27 @@ export async function listConversationsForUser(
     );
 }
 
+/**
+ * Total unread messages across a user's conversations, for the nav badge.
+ *
+ * Unread counts live in a map keyed by uid (`unread.{uid}`), so Firestore can't
+ * sum them — an aggregation query can count documents but not add up a field,
+ * and a per-user field path can't be indexed. The read is unavoidable; what this
+ * avoids is the object construction and sort that listConversationsForUser does
+ * on every single page render just to produce one number.
+ */
+export async function countUnreadForUser(uid: string): Promise<number> {
+  const snap = await conversationsCol()
+    .where("participants", "array-contains", uid)
+    .select(`unread.${uid}`)
+    .get();
+
+  return snap.docs.reduce((total, doc) => {
+    const value = (doc.data() as { unread?: Record<string, number> }).unread?.[uid];
+    return total + (typeof value === "number" ? value : 0);
+  }, 0);
+}
+
 export async function getMessages(conversationId: string): Promise<Message[]> {
   const snap = await messagesCol(conversationId).orderBy("createdAt", "asc").get();
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Message, "id">) }));

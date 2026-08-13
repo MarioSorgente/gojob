@@ -71,7 +71,7 @@ export function ImageUpload({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={busy}
-          className="rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50"
+          className="min-h-11 cursor-pointer rounded-xl border border-border bg-surface px-4 text-sm font-semibold outline-none transition-colors hover:bg-slate-50 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {busy ? "Uploading…" : preview ? "Change" : label}
         </button>

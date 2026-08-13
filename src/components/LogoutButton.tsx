@@ -18,7 +18,7 @@ export function LogoutButton() {
         })
       }
       disabled={pending}
-      className="text-sm font-medium text-muted hover:text-foreground"
+      className="cursor-pointer rounded px-1 py-1 text-sm font-medium text-muted outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {pending ? "…" : "Log out"}
     </button>

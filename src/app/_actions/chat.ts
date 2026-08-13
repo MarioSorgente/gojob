@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/rateLimit";
 import {
   getConversation,
   markConversationRead,
@@ -22,10 +23,24 @@ async function assertParticipant(
   return conv;
 }
 
-export async function sendMessageAction(conversationId: string, body: string) {
+export interface SendMessageResult {
+  /** Set when the message was refused — shown to the sender verbatim. */
+  error?: string;
+}
+
+export async function sendMessageAction(
+  conversationId: string,
+  body: string,
+): Promise<SendMessageResult> {
   const user = await requireUser();
   await assertParticipant(conversationId, user.uid);
-  if (body.trim()) await sendMessage(conversationId, user.uid, body);
+  if (!body.trim()) return {};
+
+  const limited = await checkRateLimit(user.uid, "message");
+  if (limited) return { error: limited };
+
+  await sendMessage(conversationId, user.uid, body);
+  return {};
 }
 
 export async function markReadAction(conversationId: string) {

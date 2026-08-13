@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useState } from "react";
-import { Button, Input, Select } from "./ui";
+import { useState, useTransition } from "react";
+import { Button, Input, Select, Spinner } from "./ui";
 import { cn } from "@/lib/cn";
 
 export interface FilterField {
@@ -29,6 +29,10 @@ export function FilterBar({
   const params = useSearchParams();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(params.get("q") ?? "");
+  // Every filter change is a server round-trip that re-runs the search. Without
+  // this the page simply froze on the old results with no sign anything had
+  // happened — the single biggest reason the app felt slow.
+  const [pending, start] = useTransition();
 
   const activeCount = fields.filter((f) => params.get(f.name)).length;
 
@@ -38,12 +42,12 @@ export function FilterBar({
       if (v) next.set(k, v);
       else next.delete(k);
     }
-    router.push(`${pathname}?${next.toString()}`);
+    start(() => router.push(`${pathname}?${next.toString()}`));
   }
 
   function clearAll() {
     setQuery("");
-    router.push(pathname);
+    start(() => router.push(pathname));
   }
 
   return (
@@ -64,7 +68,10 @@ export function FilterBar({
           type="button"
           variant={activeCount ? "primary" : "outline"}
           onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="shrink-0"
         >
+          {pending ? <Spinner /> : null}
           Filters{activeCount ? ` (${activeCount})` : ""}
         </Button>
       </form>
@@ -125,9 +132,10 @@ export function FilterBar({
           <button
             type="button"
             onClick={clearAll}
+            disabled={!activeCount && !query}
             className={cn(
-              "text-sm font-semibold text-brand",
-              !activeCount && !query && "opacity-50",
+              "cursor-pointer rounded px-1 py-0.5 text-sm font-semibold text-brand outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
+              "disabled:cursor-not-allowed disabled:opacity-50",
             )}
           >
             Clear all

@@ -52,6 +52,7 @@ export async function loadJobsPageAction(
       job: r.job,
       score: r.score,
       reasons: r.reasons,
+      breakdown: r.breakdown,
     })),
     nextCursor: page.nextCursor,
   };

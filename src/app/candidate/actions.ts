@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/rateLimit";
 import {
   candidateApply,
   candidatePass,
@@ -11,6 +12,10 @@ import {
 
 export async function applyToJobAction(jobId: string): Promise<ActionResult> {
   const user = await requireRole("candidate");
+
+  const limited = await checkRateLimit(user.uid, "apply");
+  if (limited) return { matched: false, error: limited };
+
   const res = await candidateApply(jobId, user.uid);
   revalidatePath("/candidate");
   revalidatePath("/candidate/applications");

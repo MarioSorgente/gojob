@@ -5,8 +5,9 @@ import { getCandidate } from "@/lib/repos/candidates";
 import { getJob, scoreJobForCandidate } from "@/lib/repos/jobs";
 import { getJobCandidate } from "@/lib/repos/pipeline";
 import { formatSalaryRange } from "@/lib/cn";
-import { Badge, Button, Card } from "@/components/ui";
-import { MatchPercent, ReasonList } from "@/components/cards/match";
+import { Badge, ButtonLink, Card } from "@/components/ui";
+import { ReasonList } from "@/components/cards/match";
+import { MatchExplain } from "@/components/cards/MatchExplain";
 import { JobActions } from "@/components/candidate/JobActions";
 
 export default async function CandidateJobDetail({
@@ -22,7 +23,7 @@ export default async function CandidateJobDetail({
   const job = await getJob(jobId);
   if (!job || job.status !== "live") notFound();
 
-  const { score, reasons } = await scoreJobForCandidate(job, candidate);
+  const { score, reasons, breakdown } = await scoreJobForCandidate(job, candidate);
   const entry = await getJobCandidate(jobId, user.uid);
   const applied = entry?.candidateAction === "applied";
   const matched = entry?.matchId != null;
@@ -42,7 +43,7 @@ export default async function CandidateJobDetail({
             <h1 className="text-xl font-bold leading-tight">{job.role}</h1>
             <p className="text-muted">{job.businessName}</p>
           </div>
-          <MatchPercent score={score} />
+          <MatchExplain score={score} breakdown={breakdown} reasons={reasons} />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
           {job.businessVerified ? (
@@ -103,11 +104,9 @@ export default async function CandidateJobDetail({
 
       <div className="pt-1">
         {matched ? (
-          <Link href="/candidate/matches">
-            <Button size="lg" className="w-full">
-              🎉 You matched — open chats
-            </Button>
-          </Link>
+          <ButtonLink href="/candidate/matches" size="lg" className="w-full">
+            🎉 You matched — open chats
+          </ButtonLink>
         ) : (
           <JobActions
             jobId={job.id}

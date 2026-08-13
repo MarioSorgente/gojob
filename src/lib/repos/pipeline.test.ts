@@ -278,6 +278,45 @@ describe("setEmployerAction", () => {
       "Shortlist entry not found",
     );
   });
+
+  it("unsaving returns the candidate to the recommended deck", async () => {
+    await setEmployerAction(JOB_ID, CANDIDATE, "saved");
+    await setEmployerAction(JOB_ID, CANDIDATE, "none");
+
+    const row = await entry();
+    // The deck filters on exactly these two fields.
+    expect(row.employerAction).toBe("none");
+    expect(row.stage).toBe("recommended");
+  });
+
+  it("un-passing restores the stage that passing changed", async () => {
+    await setEmployerAction(JOB_ID, CANDIDATE, "passed");
+    expect((await entry()).stage).toBe("rejected");
+
+    await setEmployerAction(JOB_ID, CANDIDATE, "none");
+    const row = await entry();
+    expect(row.employerAction).toBe("none");
+    expect(row.stage).toBe("recommended");
+  });
+
+  it("never resurrects a matched pair", async () => {
+    await candidateApply(JOB_ID, CANDIDATE);
+    await setEmployerAction(JOB_ID, CANDIDATE, "invited");
+    expect((await entry()).stage).toBe("matched");
+
+    await setEmployerAction(JOB_ID, CANDIDATE, "none");
+    const row = await entry();
+    expect(row.stage).toBe("matched");
+    expect(row.matchId).toBeTruthy();
+  });
+
+  it("does not undo a rejection the candidate caused", async () => {
+    // The candidate passed on the job; the employer clearing their own action
+    // must not put the pair back in play.
+    await candidatePass(JOB_ID, CANDIDATE);
+    await setEmployerAction(JOB_ID, CANDIDATE, "none");
+    expect((await entry()).stage).toBe("rejected");
+  });
 });
 
 describe("invitations", () => {

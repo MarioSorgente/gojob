@@ -55,7 +55,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 bottom-24 z-[60] flex flex-col items-center gap-2 px-5">
+      {/* aria-live so screen readers announce action feedback, which they
+          previously never did. Sits above the mobile bottom bar, and drops to
+          a normal offset once that bar is gone at md. */}
+      <div
+        role="status"
+        aria-live="polite"
+        className="pointer-events-none fixed inset-x-0 bottom-24 z-[60] flex flex-col items-center gap-2 px-5 md:bottom-6"
+      >
         {toasts.map((t) => (
           <div
             key={t.id}

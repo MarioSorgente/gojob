@@ -40,6 +40,14 @@
         { "fieldPath": "profileStrength", "order": "DESCENDING" },
         { "fieldPath": "userId", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "shortlist",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "businessId", "order": "ASCENDING" },
+        { "fieldPath": "employerAction", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

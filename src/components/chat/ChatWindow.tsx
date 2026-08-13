@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { getClientDb } from "@/lib/firebase/client";
 import { markReadAction, sendMessageAction } from "@/app/_actions/chat";
+import { useToast } from "@/components/Toast";
+import { Spinner } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { Message } from "@/lib/types";
 
@@ -24,6 +26,8 @@ export function ChatWindow({
 }) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const { show } = useToast();
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,9 +56,25 @@ export function ChatWindow({
   async function send(e: React.FormEvent) {
     e.preventDefault();
     const body = text.trim();
-    if (!body) return;
+    if (!body || sending) return;
+
+    // Clear optimistically so the input feels instant, but restore the text if
+    // the send fails — previously a failure silently ate the message, because
+    // the input was cleared before the await and nothing caught the error.
+    setSending(true);
     setText("");
-    await sendMessageAction(conversationId, body);
+    try {
+      const res = await sendMessageAction(conversationId, body);
+      if (res.error) {
+        setText(body);
+        show(res.error, "error");
+      }
+    } catch {
+      setText(body);
+      show("Message not sent. Check your connection and try again.", "error");
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -100,11 +120,12 @@ export function ChatWindow({
         />
         <button
           type="submit"
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-brand text-white disabled:opacity-50"
-          disabled={!text.trim()}
+          className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand text-white outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+          // Disabling while in flight stops a double-tap sending twice.
+          disabled={!text.trim() || sending}
           aria-label="Send"
         >
-          ➤
+          {sending ? <Spinner className="border-white" /> : "➤"}
         </button>
       </form>
     </div>

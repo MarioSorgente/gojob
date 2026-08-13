@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { applyToJobAction, passJobAction } from "@/app/candidate/actions";
-import { Button } from "@/components/ui";
+import { Button, Spinner } from "@/components/ui";
 import { MatchCelebration } from "@/components/MatchCelebration";
+import { useToast } from "@/components/Toast";
 
 export function JobActions({
   jobId,
@@ -16,6 +17,7 @@ export function JobActions({
   businessName: string;
 }) {
   const router = useRouter();
+  const { show } = useToast();
   const [pending, start] = useTransition();
   const [applied, setApplied] = useState(initialApplied);
   const [matchHref, setMatchHref] = useState<string | null>(null);
@@ -23,6 +25,12 @@ export function JobActions({
   function apply() {
     start(async () => {
       const res = await applyToJobAction(jobId);
+      // Refused (rate limited) — don't tell the user they applied when they
+      // didn't.
+      if (res.error) {
+        show(res.error, "error");
+        return;
+      }
       setApplied(true);
       if (res.matched && res.conversationId) {
         setMatchHref(`/candidate/chat/${res.conversationId}`);
@@ -54,13 +62,20 @@ export function JobActions({
           Pass
         </Button>
         <Button size="lg" onClick={apply} disabled={pending}>
-          {pending ? "…" : "Apply"}
+          {pending ? <Spinner /> : null}
+          Apply
         </Button>
       </div>
       <MatchCelebration
         open={!!matchHref}
         chatHref={matchHref ?? "#"}
         subtitle={`You and ${businessName} are connected.`}
+        // Without this the overlay had no dismiss control at all — the only way
+        // out of a successful match was to open the chat.
+        onClose={() => {
+          setMatchHref(null);
+          router.refresh();
+        }}
       />
     </>
   );

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { setRoleAction } from "@/app/onboarding/actions";
 import type { UserRole } from "@/lib/types";
+import { interactive } from "@/components/ui";
 import { cn } from "@/lib/cn";
 
 const OPTIONS: {
@@ -47,16 +48,20 @@ export function RoleSelect({
       {OPTIONS.map((o) => (
         <button
           key={o.role}
+          type="button"
           onClick={() => choose(o.role)}
           disabled={pending}
           className={cn(
-            "flex w-full items-start gap-4 rounded-2xl border-2 bg-surface p-5 text-left transition-colors disabled:opacity-60",
+            "flex w-full items-start gap-4 rounded-2xl border-2 bg-surface p-5 text-left",
+            interactive,
             selected === o.role
               ? "border-brand ring-2 ring-brand/20"
               : "border-border hover:border-brand/40",
           )}
         >
-          <span className="text-3xl">{o.icon}</span>
+          <span aria-hidden="true" className="text-3xl">
+            {o.icon}
+          </span>
           <span>
             <span className="block text-lg font-bold">{o.title}</span>
             <span className="block text-sm text-muted">{o.text}</span>

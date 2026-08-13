@@ -60,6 +60,7 @@ export function JobResults({
             job={r.job}
             score={r.score}
             reasons={r.reasons}
+            breakdown={r.breakdown}
             href={`/candidate/jobs/${r.job.id}`}
           />
         ))}

@@ -36,6 +36,37 @@ export async function getShortlist(jobId: string): Promise<JobCandidate[]> {
     .sort((a, b) => b.score - a.score);
 }
 
+export interface ShortlistCounts {
+  total: number;
+  applied: number;
+  matched: number;
+}
+
+/**
+ * Headline counts for a job's shortlist.
+ *
+ * The employer dashboard rendered three integers per job by reading every
+ * shortlist document in full — each of which embeds a whole candidateSummary.
+ * Ten jobs with fifty candidates meant ~500 document reads and a few hundred KB
+ * on the employer's landing page, every single visit. These are aggregation
+ * queries: the server returns the counts, never the documents.
+ */
+export async function getShortlistCounts(jobId: string): Promise<ShortlistCounts> {
+  const col = jobsCol().doc(jobId).collection(COLLECTIONS.shortlist);
+
+  const [total, applied, matched] = await Promise.all([
+    col.count().get(),
+    col.where("candidateAction", "==", "applied").count().get(),
+    col.where("stage", "in", ["matched", "interview", "hired"]).count().get(),
+  ]);
+
+  return {
+    total: total.data().count,
+    applied: applied.data().count,
+    matched: matched.data().count,
+  };
+}
+
 export async function getJobCandidate(
   jobId: string,
   candidateId: string,
@@ -173,6 +204,13 @@ export interface ActionResult {
   matched: boolean;
   matchId?: string;
   conversationId?: string;
+  /**
+   * Set when the action was refused for a reason worth showing the user (today,
+   * only rate limiting). Returned rather than thrown because Next redacts
+   * server-action error messages in production builds — a thrown message would
+   * reach the browser as a generic digest and the user would learn nothing.
+   */
+  error?: string;
 }
 
 /**
@@ -216,15 +254,40 @@ export async function ensureShortlistEntry(
   return entry;
 }
 
-/** Employer taps Pass / Save / Invite on a candidate card. */
+/**
+ * Employer taps Pass / Save / Invite on a candidate card, or clears a previous
+ * action with "none".
+ *
+ * "none" is the undo path — reachable today from unsaving on the shortlist.
+ * Saving deliberately never changed `stage`, so clearing it needs nothing else
+ * rewound and the candidate returns to the swipe deck, which filters on
+ * `employerAction === "none" && stage === "recommended"`. Undoing a *pass* also
+ * has to restore the stage, since passing does move it to "rejected".
+ */
 export async function setEmployerAction(
   jobId: string,
   candidateId: string,
-  action: Exclude<EmployerAction, "none">,
+  action: EmployerAction,
 ): Promise<ActionResult> {
   const entry = await getJobCandidate(jobId, candidateId);
   if (!entry) throw new Error("Shortlist entry not found");
   const now = new Date().toISOString();
+
+  if (action === "none") {
+    await shortlistDoc(jobId, candidateId).set(
+      {
+        employerAction: "none",
+        // Only rewind the stage if this action is what set it to rejected;
+        // never resurrect a matched or hired pair.
+        ...(entry.stage === "rejected" && entry.candidateAction !== "passed"
+          ? { stage: "recommended" }
+          : {}),
+        updatedAt: now,
+      },
+      { merge: true },
+    );
+    return { matched: false };
+  }
 
   if (action === "passed") {
     await shortlistDoc(jobId, candidateId).set(

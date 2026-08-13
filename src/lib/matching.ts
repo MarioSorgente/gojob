@@ -66,6 +66,58 @@ export interface MatchResult {
   reasons: string[];
 }
 
+/** Display metadata for each scoring factor, in the order the UI shows them. */
+export const FACTOR_LABELS: Record<keyof MatchBreakdown, string> = {
+  role: "Role",
+  experience: "Experience",
+  skills: "Skills",
+  salary: "Salary fit",
+  location: "Location",
+  availability: "Availability",
+  profileStrength: "Profile completeness",
+};
+
+export interface MatchFactor {
+  key: keyof MatchBreakdown;
+  label: string;
+  /** This factor's share of the total, as a percentage (e.g. 30 for role). */
+  weightPercent: number;
+  /** How well the candidate scored on this factor alone, 0..100. */
+  subScore: number;
+  /** Points this factor contributed to the headline score. */
+  points: number;
+  /** The most it could have contributed. */
+  maxPoints: number;
+}
+
+/**
+ * Turn a stored breakdown into the rows the score explainer renders.
+ *
+ * `MatchBreakdown` holds each factor's standalone 0..100 sub-score, *not* its
+ * contribution to the headline number — so the UI has to weight them or the
+ * figures won't reconcile. That multiplication lives here rather than in a
+ * component so it can be tested against real computeMatch output.
+ *
+ * Rounding note: sub-scores are rounded to integers before being stored, and
+ * the headline score is rounded separately. Summing `points` therefore lands
+ * within ~1 point of `score` rather than exactly on it — bounded, because the
+ * per-factor error is at most 0.5 × weight and the weights sum to 1.
+ */
+export function explainMatch(breakdown: MatchBreakdown): MatchFactor[] {
+  return (Object.keys(WEIGHTS) as (keyof MatchBreakdown)[]).map((key) => {
+    const weight = WEIGHTS[key];
+    const subScore = breakdown[key] ?? 0;
+    return {
+      key,
+      label: FACTOR_LABELS[key],
+      weightPercent: Math.round(weight * 100),
+      subScore,
+      points: subScore * weight,
+      maxPoints: Math.round(weight * 100),
+    };
+  });
+}
+
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 const norm = (s: string) => s.trim().toLowerCase();
 const pct = (n: number) => Math.round(clamp01(n) * 100);

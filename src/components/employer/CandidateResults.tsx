@@ -62,15 +62,19 @@ export function CandidateResults({
 
   return (
     <>
-      <div className="space-y-2">
+      <div className="space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
         {items.map((c) => (
-          <Link key={c.userId} href={`/employer/candidates/${c.userId}`} className="block">
+          // Stretched link rather than wrapping the row: a <button> inside an
+          // <a> is invalid, and the previous `<div onClick={preventDefault}>`
+          // only suppressed mouse clicks — keyboard activation of Invite still
+          // navigated away.
+          <div key={c.userId} className="relative">
             <ApplicantRow
               summary={c.summary}
               score={c.profileStrength}
               scoreLabel="profile"
               right={
-                <div onClick={(e) => e.preventDefault()}>
+                <div className="relative z-10">
                   <InviteToJobButton
                     candidateId={c.userId}
                     name={c.firstName}
@@ -79,7 +83,13 @@ export function CandidateResults({
                 </div>
               }
             />
-          </Link>
+            <Link
+              href={`/employer/candidates/${c.userId}`}
+              className="absolute inset-0 z-0 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              <span className="sr-only">View {c.firstName}&apos;s profile</span>
+            </Link>
+          </div>
         ))}
       </div>
       <LoadMoreButton

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { requireRole } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/rateLimit";
 import { getBusinessByOwner } from "@/lib/repos/businesses";
 import { createAndPublishJob, generateShortlist, getJob } from "@/lib/repos/jobs";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@/lib/repos/pipeline";
 import type { JobInput } from "@/lib/forms";
 import type { EmploymentType } from "@/lib/taxonomy";
+import type { EmployerAction } from "@/lib/types";
 
 export async function createJobAction(input: JobInput) {
   const user = await requireRole("employer");
@@ -65,12 +67,19 @@ async function assertOwnsJob(jobId: string, uid: string) {
 export async function employerActionOnCandidate(
   jobId: string,
   candidateId: string,
-  action: "passed" | "saved" | "invited",
+  action: EmployerAction,
 ): Promise<ActionResult> {
   const user = await requireRole("employer");
   await assertOwnsJob(jobId, user.uid);
+  // Only invitations reach the candidate, so only those are throttled —
+  // pass/save/unsave are private bookkeeping and shouldn't be limited.
+  if (action === "invited") {
+    const limited = await checkRateLimit(user.uid, "invite");
+    if (limited) return { matched: false, error: limited };
+  }
   const res = await setEmployerAction(jobId, candidateId, action);
   revalidatePath(`/employer/jobs/${jobId}`);
+  revalidatePath("/employer/shortlist");
   revalidatePath("/employer/matches");
   return res;
 }
@@ -85,6 +94,9 @@ export async function inviteFromSearchAction(
 ): Promise<ActionResult> {
   const user = await requireRole("employer");
   await assertOwnsJob(jobId, user.uid);
+  const limited = await checkRateLimit(user.uid, "invite");
+  if (limited) return { matched: false, error: limited };
+
   await ensureShortlistEntry(jobId, candidateId);
   const res = await setEmployerAction(jobId, candidateId, "invited");
   revalidatePath("/employer/candidates");

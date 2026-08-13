@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { getBusinessByOwner } from "@/lib/repos/businesses";
-import { Badge, Button, Card, PageTitle } from "@/components/ui";
+import { Badge, ButtonLink, Card, PageTitle } from "@/components/ui";
 import { BusinessVerificationCard } from "@/components/employer/BusinessVerificationCard";
 
 export default async function BusinessPage() {
@@ -40,16 +39,12 @@ export default async function BusinessPage() {
       />
 
       <div className="grid grid-cols-2 gap-3">
-        <Link href="/employer/business/edit">
-          <Button variant="outline" className="w-full">
-            Edit venue
-          </Button>
-        </Link>
-        <Link href="/employer/plans">
-          <Button variant="outline" className="w-full">
-            Plans
-          </Button>
-        </Link>
+        <ButtonLink href="/employer/business/edit" variant="outline" className="w-full">
+          Edit venue
+        </ButtonLink>
+        <ButtonLink href="/employer/plans" variant="outline" className="w-full">
+          Plans
+        </ButtonLink>
       </div>
     </div>
   );
