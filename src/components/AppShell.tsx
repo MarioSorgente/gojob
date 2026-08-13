@@ -35,8 +35,8 @@ export function AppShell({
         <TopBar right={<LogoutButton />} />
       </div>
 
-      {/* pb-20 clears the fixed bottom bar on phones; the sidebar needs none. */}
-      <main className="app-shell-content mx-auto w-full max-w-md px-5 py-5 pb-20 md:max-w-5xl md:px-8 md:py-8 md:pb-8">
+      {/* Clear the full bottom bar, including the device safe-area inset. */}
+      <main className="app-shell-content mx-auto w-full max-w-md px-5 py-5 pb-[var(--bottom-nav-clearance)] md:max-w-5xl md:px-8 md:py-8 md:pb-8">
         {children}
       </main>
 

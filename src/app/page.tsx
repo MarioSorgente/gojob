@@ -89,7 +89,7 @@ export default function LandingPage() {
               className="relative hidden lg:block"
               aria-label="Example GoJob candidate matches"
             >
-              <div className="absolute -left-5 top-14 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-lg">
+              <div className="absolute -top-8 left-8 rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white shadow-lg">
                 12 matches found ⚡
               </div>
               <div className="ml-8 rounded-3xl border border-border bg-surface p-6 shadow-xl shadow-slate-300/40">
