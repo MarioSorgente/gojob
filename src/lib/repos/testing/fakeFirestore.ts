@@ -164,7 +164,7 @@ class FakeCollectionRef {
   where(field: string, op: WhereOp, value: unknown): FakeQuery {
     return this.query().where(field, op, value);
   }
-  orderBy(field: string, dir?: "asc" | "desc"): FakeQuery {
+  orderBy(field: unknown, dir?: "asc" | "desc"): FakeQuery {
     return this.query().orderBy(field, dir);
   }
   limit(n: number): FakeQuery {
@@ -218,8 +218,9 @@ class FakeDocRef {
 
 class FakeQuery {
   private filters: Filter[] = [];
-  private order: { field: string; dir: "asc" | "desc" } | null = null;
+  private order: { field: string; dir: "asc" | "desc" }[] = [];
   private max: number | null = null;
+  private after: unknown[] | null = null;
 
   constructor(
     private readonly db: FakeFirestore,
@@ -231,10 +232,12 @@ class FakeQuery {
     return this;
   }
 
-  orderBy(field: string, dir: "asc" | "desc" = "asc"): FakeQuery {
-    // Only the primary sort is modelled; the repos use later orderBy clauses
-    // purely as cursor tie-breakers.
-    this.order ??= { field, dir };
+  orderBy(field: unknown, dir: "asc" | "desc" = "asc"): FakeQuery {
+    // FieldPath.documentId() is an SDK sentinel; no public property is exposed.
+    this.order.push({
+      field: typeof field === "string" ? field : "__name__",
+      dir,
+    });
     return this;
   }
 
@@ -243,13 +246,9 @@ class FakeQuery {
     return this;
   }
 
-  /**
-   * Accepted and ignored. Cursor paging is covered directly in
-   * pagination.test.ts against a deterministic source; modelling it here would
-   * mean reimplementing Firestore's ordering semantics in the double, which is
-   * exactly the kind of fiction that makes a fake stop being trustworthy.
-   */
-  startAfter(): FakeQuery {
+  /** Continue after the ordered values, including document-id tie-breakers. */
+  startAfter(...values: unknown[]): FakeQuery {
+    this.after = values;
     return this;
   }
 
@@ -259,15 +258,36 @@ class FakeQuery {
       .filter((row) => row.data !== undefined)
       .filter((row) => this.filters.every((f) => matches(row.data, f)));
 
-    if (this.order) {
-      const { field, dir } = this.order;
-      rows = [...rows].sort((a, b) => {
-        const av = readPath(a.data, field);
-        const bv = readPath(b.data, field);
-        if (av === bv) return 0;
+    const compare = (
+      a: { path: string; data: Data },
+      b: { path: string; data: Data },
+    ) => {
+      for (const { field, dir } of this.order) {
+        const av =
+          field === "__name__"
+            ? a.path.split("/").pop()
+            : readPath(a.data, field);
+        const bv =
+          field === "__name__"
+            ? b.path.split("/").pop()
+            : readPath(b.data, field);
+        if (av === bv) continue;
         const less = (av as never) < (bv as never) ? -1 : 1;
         return dir === "asc" ? less : -less;
+      }
+      return 0;
+    };
+    if (this.order.length) {
+      rows = [...rows].sort((a, b) => {
+        return compare(a, b);
       });
+      if (this.after) {
+        const synthetic = { path: String(this.after.at(-1)), data: {} as Data };
+        this.order.forEach(({ field }, index) => {
+          if (field !== "__name__") synthetic.data[field] = this.after![index];
+        });
+        rows = rows.filter((row) => compare(row, synthetic) > 0);
+      }
     }
 
     return this.max === null ? rows : rows.slice(0, this.max);

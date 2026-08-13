@@ -1,11 +1,18 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { FieldPath } from "firebase-admin/firestore";
 import { adminDb } from "../firebase/admin";
 import { COLLECTIONS } from "../collections";
 import { withIndexFallback } from "../firestoreErrors";
 import { computeMatch } from "../matching";
 import { getJob } from "./jobs";
 import { getCandidate, toCandidateSummary } from "./candidates";
+import {
+  decodeCursor,
+  encodeCursor,
+  PAGE_SIZE,
+  type Page,
+} from "../pagination";
 import type {
   Conversation,
   EmployerAction,
@@ -32,15 +39,74 @@ export interface HydratedEntry {
 // Reads
 // ---------------------------------------------------------------------------
 
-/** A job's shortlist, ranked highest-first (employer recommended candidates). */
+interface ShortlistCursor {
+  score: number;
+  id: string;
+}
+
+// Old shortlist rows predate score. Repair only a fixed window: this keeps a
+// request bounded while making the legacy rows it encounters queryable (an
+// orderBy query otherwise omits documents where the field is absent).
+const LEGACY_SCORE_REPAIR_LIMIT = 100;
+
+/** A bounded page of a job's shortlist, ranked highest-first. */
+export async function getShortlistPage(
+  jobId: string,
+  cursor: string | null = null,
+  pageSize = PAGE_SIZE,
+): Promise<Page<JobCandidate>> {
+  const size =
+    Number.isInteger(pageSize) && pageSize > 0
+      ? Math.min(pageSize, 100)
+      : PAGE_SIZE;
+  const col = jobsCol().doc(jobId).collection(COLLECTIONS.shortlist);
+
+  if (!cursor) {
+    const legacyWindow = await col.limit(LEGACY_SCORE_REPAIR_LIMIT).get();
+    const missing = legacyWindow.docs.filter(
+      (doc) =>
+        typeof doc.data().score !== "number" ||
+        !Number.isFinite(doc.data().score),
+    );
+    if (missing.length) {
+      const batch = adminDb().batch();
+      missing.forEach((doc) =>
+        batch.set(doc.ref, { score: 0 }, { merge: true }),
+      );
+      await batch.commit();
+    }
+  }
+
+  let query = col
+    .orderBy("score", "desc")
+    .orderBy(FieldPath.documentId(), "desc");
+  const start = decodeCursor<ShortlistCursor>(cursor);
+  if (
+    start &&
+    typeof start === "object" &&
+    typeof start.score === "number" &&
+    Number.isFinite(start.score) &&
+    typeof start.id === "string"
+  ) {
+    query = query.startAfter(start.score, start.id);
+  }
+
+  const snap = await query.limit(size + 1).get();
+  const docs = snap.docs.slice(0, size);
+  const items = docs.map((doc) => doc.data() as JobCandidate);
+  const last = docs.at(-1);
+  return {
+    items,
+    nextCursor:
+      snap.docs.length > size && last
+        ? encodeCursor({ score: last.data().score as number, id: last.id })
+        : null,
+  };
+}
+
+/** @deprecated Prefer getShortlistPage so reads remain bounded. */
 export async function getShortlist(jobId: string): Promise<JobCandidate[]> {
-  const snap = await jobsCol()
-    .doc(jobId)
-    .collection(COLLECTIONS.shortlist)
-    .get();
-  return snap.docs
-    .map((d) => d.data() as JobCandidate)
-    .sort((a, b) => b.score - a.score);
+  return (await getShortlistPage(jobId)).items;
 }
 
 export interface ShortlistCounts {
@@ -58,7 +124,9 @@ export interface ShortlistCounts {
  * on the employer's landing page, every single visit. These are aggregation
  * queries: the server returns the counts, never the documents.
  */
-export async function getShortlistCounts(jobId: string): Promise<ShortlistCounts> {
+export async function getShortlistCounts(
+  jobId: string,
+): Promise<ShortlistCounts> {
   const col = jobsCol().doc(jobId).collection(COLLECTIONS.shortlist);
 
   const [total, applied, matched] = await Promise.all([
@@ -82,7 +150,9 @@ export async function getJobCandidate(
   return snap.exists ? (snap.data() as JobCandidate) : null;
 }
 
-async function hydrateWithJobs(entries: JobCandidate[]): Promise<HydratedEntry[]> {
+async function hydrateWithJobs(
+  entries: JobCandidate[],
+): Promise<HydratedEntry[]> {
   const jobIds = [...new Set(entries.map((e) => e.jobId))];
   const jobs = new Map<string, Job>();
   await Promise.all(
@@ -108,7 +178,9 @@ async function hydrateWithJobs(entries: JobCandidate[]): Promise<HydratedEntry[]
  * back to reading the row directly out of each job, which needs no index at all
  * because it addresses documents by path.
  */
-export async function candidateEntries(candidateId: string): Promise<JobCandidate[]> {
+export async function candidateEntries(
+  candidateId: string,
+): Promise<JobCandidate[]> {
   return withIndexFallback(
     "candidateEntries",
     async () => {
@@ -128,9 +200,7 @@ export async function candidateEntries(candidateId: string): Promise<JobCandidat
         d.ref.collection(COLLECTIONS.shortlist).doc(candidateId),
       );
       const docs = await adminDb().getAll(...refs);
-      return docs
-        .filter((d) => d.exists)
-        .map((d) => d.data() as JobCandidate);
+      return docs.filter((d) => d.exists).map((d) => d.data() as JobCandidate);
     },
   );
 }
@@ -428,9 +498,9 @@ export async function markHired(
 ): Promise<void> {
   const db = adminDb();
   const rowRef = shortlistDoc(jobId, candidateId);
-  const hireRef = db.collection(COLLECTIONS.hires).doc(
-    `hire_${relationshipId(jobId, candidateId)}`,
-  );
+  const hireRef = db
+    .collection(COLLECTIONS.hires)
+    .doc(`hire_${relationshipId(jobId, candidateId)}`);
 
   await db.runTransaction(async (transaction) => {
     // Read both documents before writing so retries preserve the original hire.

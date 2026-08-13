@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { getJob } from "@/lib/repos/jobs";
-import { getShortlist } from "@/lib/repos/pipeline";
+import { getShortlistPage } from "@/lib/repos/pipeline";
 import { formatSalaryRange } from "@/lib/cn";
 import { Badge, Card, EmptyState, Section } from "@/components/ui";
 import { MatchExplain } from "@/components/cards/MatchExplain";
@@ -19,7 +19,7 @@ export default async function EmployerJobDetail({
   searchParams,
 }: {
   params: Promise<{ jobId: string }>;
-  searchParams: Promise<{ published?: string }>;
+  searchParams: Promise<{ published?: string; shortlistCursor?: string }>;
 }) {
   const { jobId } = await params;
   const sp = await searchParams;
@@ -29,7 +29,11 @@ export default async function EmployerJobDetail({
   const job = await getJob(jobId);
   if (!job || job.ownerId !== user.uid) notFound();
 
-  const shortlist = await getShortlist(jobId);
+  const shortlistPage = await getShortlistPage(
+    jobId,
+    sp.shortlistCursor ?? null,
+  );
+  const shortlist = shortlistPage.items;
 
   // Jobs created before shortlistStatus existed have no value; treat those as
   // finished rather than leaving them spinning forever.
@@ -52,7 +56,10 @@ export default async function EmployerJobDetail({
     }));
 
   const applied = shortlist.filter(
-    (e) => e.candidateAction === "applied" && !e.matchId && e.employerAction !== "passed",
+    (e) =>
+      e.candidateAction === "applied" &&
+      !e.matchId &&
+      e.employerAction !== "passed",
   );
   const saved = shortlist.filter(
     (e) => e.employerAction === "saved" && !e.matchId && e.stage !== "rejected",
@@ -80,11 +87,14 @@ export default async function EmployerJobDetail({
       <div>
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-xl font-bold">{job.role}</h1>
-          <Badge tone={job.status === "live" ? "green" : "slate"}>{job.status}</Badge>
+          <Badge tone={job.status === "live" ? "green" : "slate"}>
+            {job.status}
+          </Badge>
         </div>
         <p className="text-sm text-muted">
           📍 {job.area} · {job.employmentType} · 💰{" "}
-          {formatSalaryRange(job.salaryType, job.salaryMin, job.salaryMax) || "—"}
+          {formatSalaryRange(job.salaryType, job.salaryMin, job.salaryMax) ||
+            "—"}
         </p>
         <div className="mt-3">
           <ShareJob
@@ -188,26 +198,26 @@ export default async function EmployerJobDetail({
       {matched.length > 0 && (
         <Section title={`Matches (${matched.length})`}>
           <div className="space-y-2">
-          {matched.map((e) => (
-            <ApplicantRow
-              key={e.candidateId}
-              summary={e.candidateSummary}
-              score={e.score}
-              right={
-                <div className="flex flex-col items-end gap-1.5">
-                  {e.conversationId && (
-                    <Link
-                      href={`/employer/chat/${e.conversationId}`}
-                      className="text-sm font-semibold text-brand"
-                    >
-                      Chat →
-                    </Link>
-                  )}
-                  <HireButton jobId={jobId} candidateId={e.candidateId} />
-                </div>
-              }
-            />
-          ))}
+            {matched.map((e) => (
+              <ApplicantRow
+                key={e.candidateId}
+                summary={e.candidateSummary}
+                score={e.score}
+                right={
+                  <div className="flex flex-col items-end gap-1.5">
+                    {e.conversationId && (
+                      <Link
+                        href={`/employer/chat/${e.conversationId}`}
+                        className="text-sm font-semibold text-brand"
+                      >
+                        Chat →
+                      </Link>
+                    )}
+                    <HireButton jobId={jobId} candidateId={e.candidateId} />
+                  </div>
+                }
+              />
+            ))}
           </div>
         </Section>
       )}
@@ -220,11 +230,26 @@ export default async function EmployerJobDetail({
                 key={e.candidateId}
                 summary={e.candidateSummary}
                 score={e.score}
-                right={<span className="text-sm font-semibold text-success">✓ Hired</span>}
+                right={
+                  <span className="text-sm font-semibold text-success">
+                    ✓ Hired
+                  </span>
+                }
               />
             ))}
           </div>
         </Section>
+      )}
+
+      {shortlistPage.nextCursor && (
+        <div className="flex justify-center">
+          <Link
+            href={`/employer/jobs/${jobId}?shortlistCursor=${encodeURIComponent(shortlistPage.nextCursor)}`}
+            className="rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand hover:bg-brand-soft"
+          >
+            Load more candidates →
+          </Link>
+        </div>
       )}
     </div>
   );
