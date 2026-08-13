@@ -12,96 +12,12 @@
  */
 
 import type { App } from "firebase-admin/app";
+import {
+  adminIndexRequests,
+  type AdminCompositeIndex,
+} from "./firestoreIndexConfig";
 
 const API = "https://firestore.googleapis.com/v1";
-
-interface IndexField {
-  fieldPath: string;
-  order?: "ASCENDING" | "DESCENDING";
-  arrayConfig?: "CONTAINS";
-}
-
-interface CompositeIndex {
-  collectionGroup: string;
-  queryScope: "COLLECTION" | "COLLECTION_GROUP";
-  fields: IndexField[];
-}
-
-/**
- * Mirrors firestore.indexes.json. Kept as a literal rather than importing the
- * JSON so this file states exactly what it will create in the user's project.
- */
-const COMPOSITE_INDEXES: CompositeIndex[] = [
-  {
-    collectionGroup: "jobs",
-    queryScope: "COLLECTION",
-    fields: [
-      { fieldPath: "status", order: "ASCENDING" },
-      { fieldPath: "createdAt", order: "DESCENDING" },
-    ],
-  },
-  {
-    collectionGroup: "jobs",
-    queryScope: "COLLECTION",
-    fields: [
-      { fieldPath: "status", order: "ASCENDING" },
-      { fieldPath: "role", order: "ASCENDING" },
-    ],
-  },
-  {
-    collectionGroup: "conversations",
-    queryScope: "COLLECTION",
-    fields: [
-      { fieldPath: "participants", arrayConfig: "CONTAINS" },
-      { fieldPath: "lastMessageAt", order: "DESCENDING" },
-    ],
-  },
-  {
-    collectionGroup: "candidates",
-    queryScope: "COLLECTION",
-    fields: [
-      { fieldPath: "profileStrength", order: "DESCENDING" },
-      { fieldPath: "userId", order: "DESCENDING" },
-    ],
-  },
-  {
-    collectionGroup: "candidates",
-    queryScope: "COLLECTION",
-    fields: [
-      { fieldPath: "roles", arrayConfig: "CONTAINS" },
-      { fieldPath: "profileStrength", order: "DESCENDING" },
-      { fieldPath: "userId", order: "DESCENDING" },
-    ],
-  },
-  {
-    collectionGroup: "shortlist",
-    queryScope: "COLLECTION_GROUP",
-    fields: [
-      { fieldPath: "businessId", order: "ASCENDING" },
-      { fieldPath: "employerAction", order: "ASCENDING" },
-    ],
-  },
-];
-
-/**
- * Single-field exemptions. Firestore auto-indexes single fields only at
- * COLLECTION scope, so every collection-group equality filter needs one of
- * these or the query fails with FAILED_PRECONDITION.
- */
-const FIELD_OVERRIDES = [
-  {
-    collectionGroup: "shortlist",
-    fieldPath: "candidateId",
-    indexConfig: {
-      indexes: [
-        { queryScope: "COLLECTION", fields: [{ fieldPath: "candidateId", order: "ASCENDING" }] },
-        { queryScope: "COLLECTION", fields: [{ fieldPath: "candidateId", order: "DESCENDING" }] },
-        { queryScope: "COLLECTION", fields: [{ fieldPath: "candidateId", arrayConfig: "CONTAINS" }] },
-        { queryScope: "COLLECTION_GROUP", fields: [{ fieldPath: "candidateId", order: "ASCENDING" }] },
-      ],
-    },
-  },
-];
 
 export interface IndexOutcome {
   target: string;
@@ -141,9 +57,12 @@ async function post(
   return { ok: res.ok, status: res.status, text: await res.text() };
 }
 
-function describe(index: CompositeIndex): string {
+function describe(index: AdminCompositeIndex): string {
   const fields = index.fields
-    .map((f) => `${f.fieldPath}${f.arrayConfig ? " (array)" : f.order === "DESCENDING" ? " desc" : ""}`)
+    .map(
+      (f) =>
+        `${f.fieldPath}${f.arrayConfig ? " (array)" : f.order === "DESCENDING" ? " desc" : ""}`,
+    )
     .join(" + ");
   return `${index.collectionGroup} [${index.queryScope}]: ${fields}`;
 }
@@ -155,8 +74,9 @@ export async function ensureIndexes(
   const token = await accessToken(app);
   const base = `${API}/projects/${projectId}/databases/(default)/collectionGroups`;
   const results: IndexOutcome[] = [];
+  const { compositeIndexes, fieldOverrides } = adminIndexRequests();
 
-  for (const index of COMPOSITE_INDEXES) {
+  for (const index of compositeIndexes) {
     const target = describe(index);
     try {
       const res = await post(
@@ -169,7 +89,11 @@ export async function ensureIndexes(
       } else if (res.status === 409 || /ALREADY_EXISTS/i.test(res.text)) {
         results.push({ target, status: "already exists" });
       } else {
-        results.push({ target, status: "failed", detail: res.text.slice(0, 300) });
+        results.push({
+          target,
+          status: "failed",
+          detail: res.text.slice(0, 300),
+        });
       }
     } catch (error) {
       results.push({
@@ -180,14 +104,19 @@ export async function ensureIndexes(
     }
   }
 
-  for (const override of FIELD_OVERRIDES) {
+  for (const override of fieldOverrides) {
     const target = `${override.collectionGroup}.${override.fieldPath} [single-field, collection group]`;
     try {
       // Field overrides are updated, not created — the field always exists.
       const url =
         `${base}/${override.collectionGroup}/fields/${override.fieldPath}` +
         `?updateMask=indexConfig`;
-      const res = await post(url, token, { indexConfig: override.indexConfig }, "PATCH");
+      const res = await post(
+        url,
+        token,
+        { indexConfig: override.indexConfig },
+        "PATCH",
+      );
       results.push(
         res.ok
           ? { target, status: "created" }
