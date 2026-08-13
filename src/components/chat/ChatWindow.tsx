@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
-import { getClientDb } from "@/lib/firebase/client";
+import { getClientAuth, getClientDb } from "@/lib/firebase/client";
 import { markReadAction, sendMessageAction } from "@/app/_actions/chat";
 import { useToast } from "@/components/Toast";
 import { Spinner } from "@/components/ui";
@@ -31,22 +31,43 @@ export function ChatWindow({
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const q = query(
-      collection(getClientDb(), "conversations", conversationId, "messages"),
-      orderBy("createdAt", "asc"),
-    );
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setMessages(
-          snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Message, "id">) })),
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+
+    // A server session can render this page before Firebase has restored the
+    // browser session. Subscribing during that window gets permission-denied,
+    // and Firestore does not retry a failed listener when auth finishes. Wait
+    // for the initial auth state so candidate chats remain live after reloads.
+    void getClientAuth()
+      .authStateReady()
+      .then(() => {
+        if (cancelled) return;
+        const q = query(
+          collection(getClientDb(), "conversations", conversationId, "messages"),
+          orderBy("createdAt", "asc"),
         );
-      },
-      // If client-side rules deny (e.g. auth not restored), keep SSR messages.
-      () => {},
-    );
+        unsubscribe = onSnapshot(
+          q,
+          (snap) => {
+            setMessages(
+              snap.docs.map((d) => ({
+                id: d.id,
+                ...(d.data() as Omit<Message, "id">),
+              })),
+            );
+          },
+          // Keep server-rendered messages when the browser has no Firebase
+          // session (for example, after its local persistence was cleared).
+          () => {},
+        );
+      })
+      .catch(() => {});
+
     markReadAction(conversationId).catch(() => {});
-    return () => unsub();
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, [conversationId]);
 
   useEffect(() => {
@@ -68,6 +89,15 @@ export function ChatWindow({
       if (res.error) {
         setText(body);
         show(res.error, "error");
+      } else if (res.message) {
+        const message = res.message;
+        // Do not depend on the client listener to echo our own successful
+        // write: it may be unavailable when only the server session survives.
+        setMessages((current) =>
+          current.some(({ id }) => id === message.id)
+            ? current
+            : [...current, message],
+        );
       }
     } catch {
       setText(body);
