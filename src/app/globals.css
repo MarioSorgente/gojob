@@ -11,6 +11,10 @@
   --brand-soft: #ccfbf1; /* teal-100 */
   --accent: #f97316; /* orange-500 */
   --success: #16a34a; /* green-600 */
+  --bottom-nav-base-height: 3.75rem;
+  --bottom-nav-clearance: calc(
+    var(--bottom-nav-base-height) + env(safe-area-inset-bottom, 0px)
+  );
 }
 
 @theme inline {
@@ -53,10 +57,6 @@ body {
 
 /* Chat owns the bounded area between the mobile shell bars. Unlike ordinary
    pages it must not add document scroll or inherit the standard page gutter. */
-.app-shell {
-  --mobile-nav-height: 3.75rem;
-}
-
 .app-shell:has(> .app-shell-content > [data-chat-workspace]) {
   display: flex;
   height: 100dvh;
@@ -68,7 +68,7 @@ body {
   min-height: 0;
   flex: 1;
   max-width: 28rem;
-  padding: 0 0 calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+  padding: 0 0 var(--bottom-nav-clearance);
 }
 
 @media (min-width: 48rem) {
