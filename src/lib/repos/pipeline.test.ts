@@ -381,6 +381,41 @@ describe("markHired", () => {
       businessId: "biz-1",
     });
   });
+
+  it("is idempotent across sequential retries and preserves the first timestamp", async () => {
+    await seed();
+    await ensureShortlistEntry(JOB_ID, CANDIDATE);
+
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-02-03T04:05:06.000Z"));
+      await markHired(JOB_ID, CANDIDATE);
+      vi.setSystemTime(new Date("2026-03-04T05:06:07.000Z"));
+      await markHired(JOB_ID, CANDIDATE);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const hires = db.dump("hires");
+    expect(hires).toHaveLength(1);
+    expect(hires[0].data.createdAt).toBe("2026-02-03T04:05:06.000Z");
+    expect(hires[0].data.date).toBe("2026-02-03");
+    expect((await entry()).stage).toBe("hired");
+  });
+
+  it("creates one hire and consistently marks the shortlist when calls race", async () => {
+    await seed();
+    await ensureShortlistEntry(JOB_ID, CANDIDATE);
+
+    await Promise.all([
+      markHired(JOB_ID, CANDIDATE),
+      markHired(JOB_ID, CANDIDATE),
+      markHired(JOB_ID, CANDIDATE),
+    ]);
+
+    expect(db.dump("hires")).toHaveLength(1);
+    expect((await entry()).stage).toBe("hired");
+  });
 });
 
 describe("candidate-facing queries", () => {

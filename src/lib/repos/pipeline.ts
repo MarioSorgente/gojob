@@ -18,6 +18,11 @@ const jobsCol = () => adminDb().collection(COLLECTIONS.jobs);
 const shortlistDoc = (jobId: string, candidateId: string) =>
   jobsCol().doc(jobId).collection(COLLECTIONS.shortlist).doc(candidateId);
 
+function relationshipId(jobId: string, candidateId: string): string {
+  const relationship = `${jobId.length}:${jobId}${candidateId.length}:${candidateId}`;
+  return createHash("sha256").update(relationship).digest("hex");
+}
+
 export interface HydratedEntry {
   entry: JobCandidate;
   job: Job;
@@ -173,12 +178,9 @@ async function createMatch(
   job: Job,
   candidateId: string,
 ): Promise<{ matchId: string; conversationId: string } | null> {
-  // Length-prefixing makes the relationship unambiguous before hashing: pairs
-  // such as ("a:b", "c") and ("a", "b:c") cannot share the same input.
-  const relationship = `${job.id.length}:${job.id}${candidateId.length}:${candidateId}`;
-  const relationshipId = createHash("sha256").update(relationship).digest("hex");
-  const matchId = `match_${relationshipId}`;
-  const conversationId = `conversation_${relationshipId}`;
+  const id = relationshipId(job.id, candidateId);
+  const matchId = `match_${id}`;
+  const conversationId = `conversation_${id}`;
   const db = adminDb();
   const rowRef = shortlistDoc(job.id, candidateId);
   const matchRef = db.collection(COLLECTIONS.matches).doc(matchId);
@@ -424,21 +426,44 @@ export async function markHired(
   jobId: string,
   candidateId: string,
 ): Promise<void> {
-  const entry = await getJobCandidate(jobId, candidateId);
-  if (!entry) throw new Error("Shortlist entry not found");
-  const now = new Date().toISOString();
-
-  const hireRef = adminDb().collection(COLLECTIONS.hires).doc();
-  await hireRef.set({
-    jobId,
-    candidateId,
-    businessId: entry.businessId,
-    date: now.slice(0, 10),
-    createdAt: now,
-  });
-
-  await shortlistDoc(jobId, candidateId).set(
-    { stage: "hired", updatedAt: now },
-    { merge: true },
+  const db = adminDb();
+  const rowRef = shortlistDoc(jobId, candidateId);
+  const hireRef = db.collection(COLLECTIONS.hires).doc(
+    `hire_${relationshipId(jobId, candidateId)}`,
   );
+
+  await db.runTransaction(async (transaction) => {
+    // Read both documents before writing so retries preserve the original hire.
+    const [rowSnap, hireSnap] = await Promise.all([
+      transaction.get(rowRef),
+      transaction.get(hireRef),
+    ]);
+    if (!rowSnap.exists) throw new Error("Shortlist entry not found");
+
+    const entry = rowSnap.data() as Partial<JobCandidate>;
+    if (
+      entry.jobId !== jobId ||
+      entry.candidateId !== candidateId ||
+      typeof entry.businessId !== "string" ||
+      entry.businessId.length === 0
+    ) {
+      throw new Error("Invalid shortlist entry");
+    }
+
+    const now = new Date().toISOString();
+    if (!hireSnap.exists) {
+      transaction.set(hireRef, {
+        jobId,
+        candidateId,
+        businessId: entry.businessId,
+        date: now.slice(0, 10),
+        createdAt: now,
+      });
+    }
+    transaction.set(
+      rowRef,
+      { stage: "hired", updatedAt: now },
+      { merge: true },
+    );
+  });
 }
