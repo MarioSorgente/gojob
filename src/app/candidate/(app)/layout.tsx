@@ -2,9 +2,8 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { listCandidateInvitations } from "@/lib/repos/pipeline";
-import { TopBar } from "@/components/TopBar";
-import { BottomNav } from "@/components/BottomNav";
-import { LogoutButton } from "@/components/LogoutButton";
+import { countUnreadForUser } from "@/lib/repos/chat";
+import { AppShell } from "@/components/AppShell";
 
 export default async function CandidateAppLayout({
   children,
@@ -14,7 +13,11 @@ export default async function CandidateAppLayout({
   const user = await requireRole("candidate");
   if (!user.onboardingComplete) redirect("/candidate/onboarding");
 
-  const invites = await listCandidateInvitations(user.uid);
+  const [invites, unread] = await Promise.all([
+    listCandidateInvitations(user.uid),
+    countUnreadForUser(user.uid),
+  ]);
+
   const items = [
     { href: "/candidate", label: "For you", icon: "🧭" },
     { href: "/candidate/search", label: "Search", icon: "🔍" },
@@ -24,15 +27,11 @@ export default async function CandidateAppLayout({
       icon: "✨",
       badge: invites.length || undefined,
     },
-    { href: "/candidate/matches", label: "Chats", icon: "💬" },
+    // The employer side has always shown an unread count here; the candidate
+    // side didn't, so a new message was invisible until they opened Chats.
+    { href: "/candidate/matches", label: "Chats", icon: "💬", badge: unread || undefined },
     { href: "/candidate/profile", label: "Profile", icon: "🙂" },
   ];
 
-  return (
-    <div className="min-h-dvh pb-20">
-      <TopBar right={<LogoutButton />} />
-      <main className="mx-auto max-w-md px-5 py-5">{children}</main>
-      <BottomNav items={items} />
-    </div>
-  );
+  return <AppShell items={items}>{children}</AppShell>;
 }

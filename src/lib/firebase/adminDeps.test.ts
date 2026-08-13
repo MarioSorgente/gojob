@@ -22,16 +22,26 @@ import { describe, expect, it } from "vitest";
 /** Node flag that turns off require(esm), reproducing Vercel's loader. */
 const CJS_ONLY = "--no-experimental-require-module";
 
-function requiresCleanlyWithoutEsmSupport(specifier: string): {
-  ok: boolean;
-  output: string;
-} {
+/** The entry points src/lib/firebase/admin.ts imports. */
+const ENTRY_POINTS = [
+  "firebase-admin/app",
+  "firebase-admin/auth",
+  "firebase-admin/firestore",
+];
+
+/**
+ * All three are checked in a single subprocess. Spawning Node three times cost
+ * ~30s under parallel test workers, and one process proves exactly as much.
+ */
+function requiresCleanlyWithoutEsmSupport(): { ok: boolean; output: string } {
+  const script = ENTRY_POINTS.map((s) => `require(${JSON.stringify(s)});`).join("");
   try {
-    execFileSync(
-      process.execPath,
-      [CJS_ONLY, "-e", `require(${JSON.stringify(specifier)})`],
-      { cwd: process.cwd(), stdio: "pipe", encoding: "utf8", timeout: 60_000 },
-    );
+    execFileSync(process.execPath, [CJS_ONLY, "-e", script], {
+      cwd: process.cwd(),
+      stdio: "pipe",
+      encoding: "utf8",
+      timeout: 60_000,
+    });
     return { ok: true, output: "" };
   } catch (error) {
     const e = error as { stderr?: string; message?: string };
@@ -40,14 +50,14 @@ function requiresCleanlyWithoutEsmSupport(specifier: string): {
 }
 
 describe("firebase-admin loads under a CJS-only loader", () => {
-  // These are the entry points the app imports in src/lib/firebase/admin.ts.
-  it.each(["firebase-admin/app", "firebase-admin/auth", "firebase-admin/firestore"])(
-    "can require %s without native require(esm)",
-    (specifier) => {
-      const result = requiresCleanlyWithoutEsmSupport(specifier);
+  it(
+    "can require every firebase-admin entry point without native require(esm)",
+    { timeout: 90_000 },
+    () => {
+      const result = requiresCleanlyWithoutEsmSupport();
       expect(
         result.ok,
-        `require("${specifier}") failed without require(esm) support — this is ` +
+        "firebase-admin failed to load without require(esm) support — this is " +
           `exactly how it fails on Vercel:\n${result.output}`,
       ).toBe(true);
     },

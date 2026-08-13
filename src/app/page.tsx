@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand";
-import { Button } from "@/components/ui";
+import { ButtonLink } from "@/components/ui";
 
 const STEPS = [
   { icon: "📝", title: "Post a job", text: "Role, area, salary, experience — 60 seconds." },
@@ -33,16 +33,17 @@ export default function LandingPage() {
           </p>
 
           <div className="mt-6 flex flex-col gap-3">
-            <Link href="/register?role=employer">
-              <Button size="lg" className="w-full">
-                I&apos;m hiring →
-              </Button>
-            </Link>
-            <Link href="/register?role=candidate">
-              <Button size="lg" variant="outline" className="w-full">
-                I&apos;m looking for work
-              </Button>
-            </Link>
+            <ButtonLink href="/register?role=employer" size="lg" className="w-full">
+              I&apos;m hiring →
+            </ButtonLink>
+            <ButtonLink
+              href="/register?role=candidate"
+              size="lg"
+              variant="outline"
+              className="w-full"
+            >
+              I&apos;m looking for work
+            </ButtonLink>
           </div>
         </section>
 

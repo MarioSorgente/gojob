@@ -1,19 +1,23 @@
 import type { ReactNode } from "react";
-import type { CandidateSummary } from "@/lib/types";
+import type { CandidateSummary, MatchBreakdown } from "@/lib/types";
 import { formatSalaryRange } from "@/lib/cn";
 import { Avatar, Badge } from "../ui";
 import { MatchPercent, ReasonList } from "./match";
+import { MatchExplain } from "./MatchExplain";
 
 export function CandidateCard({
   summary,
   score,
   reasons,
+  breakdown,
   footer,
   showReasons = true,
 }: {
   summary: CandidateSummary;
   score?: number;
   reasons?: string[];
+  /** When present the score becomes tappable and explains itself. */
+  breakdown?: MatchBreakdown;
   footer?: ReactNode;
   showReasons?: boolean;
 }) {
@@ -29,7 +33,17 @@ export function CandidateCard({
         <div className="flex-1">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-lg font-bold leading-tight">{name}</h3>
-            {score != null && <MatchPercent score={score} />}
+            {score != null &&
+              (breakdown ? (
+                <MatchExplain
+                  score={score}
+                  breakdown={breakdown}
+                  reasons={reasons}
+                  audience="employer"
+                />
+              ) : (
+                <MatchPercent score={score} />
+              ))}
           </div>
           <p className="text-sm text-muted">
             {summary.primaryRole} · {summary.yearsExperience} yr

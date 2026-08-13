@@ -1,4 +1,5 @@
 import type {
+  AnchorHTMLAttributes,
   ButtonHTMLAttributes,
   InputHTMLAttributes,
   ReactNode,
@@ -29,9 +30,24 @@ const buttonSizes: Record<ButtonSize, string> = {
   lg: "h-12 px-5 text-base",
 };
 
+/**
+ * Interaction affordances shared by every clickable control.
+ *
+ * `cursor-pointer` is not automatic: Tailwind's Preflight doesn't add it and
+ * browsers default <button> to an arrow, so without this every button in the app
+ * reads as non-interactive on desktop. `focus-visible` gives keyboard users the
+ * ring that inputs already had, and `active:scale` gives touch users feedback
+ * before the (server) action completes — `hover:` does nothing on a phone.
+ */
+export const interactive =
+  "cursor-pointer transition-[color,background-color,border-color,box-shadow,transform] duration-150 " +
+  "outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background " +
+  "active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 disabled:active:scale-100";
+
 export function Button({
   variant = "primary",
   size = "md",
+  type = "button",
   className,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -40,13 +56,61 @@ export function Button({
 }) {
   return (
     <button
+      // Default to type="button". The HTML default is "submit", which made any
+      // Button inside a form submit it accidentally.
+      type={type}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex select-none items-center justify-center gap-2 rounded-xl font-semibold",
+        interactive,
         buttonVariants[variant],
         buttonSizes[size],
         className,
       )}
       {...props}
+    />
+  );
+}
+
+/**
+ * A link styled as a button.
+ *
+ * Exists because `<Link><Button/></Link>` puts a <button> inside an <a>, which
+ * is invalid HTML and breaks keyboard activation. Use this for navigation and
+ * keep `Button` for actions.
+ */
+export function ButtonLink({
+  variant = "primary",
+  size = "md",
+  className,
+  ...props
+}: AnchorHTMLAttributes<HTMLAnchorElement> & {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+}) {
+  return (
+    <a
+      className={cn(
+        "inline-flex select-none items-center justify-center gap-2 rounded-xl font-semibold no-underline",
+        interactive,
+        buttonVariants[variant],
+        buttonSizes[size],
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+/** Inline busy indicator. Replaces the bare "…" that collapsed button widths. */
+export function Spinner({ className }: { className?: string }) {
+  return (
+    <span
+      role="status"
+      aria-label="Loading"
+      className={cn(
+        "inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent align-[-0.125em]",
+        className,
+      )}
     />
   );
 }
@@ -119,11 +183,15 @@ export function Chip({
   return (
     <button
       type="button"
+      // aria-pressed makes the toggle state audible; min-h-11 meets the 44px
+      // touch target these previously missed at ~34px.
+      aria-pressed={active}
       className={cn(
-        "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+        "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium",
+        interactive,
         active
           ? "border-brand bg-brand text-white"
-          : "border-border bg-surface text-slate-600 hover:border-brand/50",
+          : "border-border bg-surface text-slate-600 hover:border-brand/50 hover:bg-slate-50",
         className,
       )}
       {...props}
@@ -226,10 +294,31 @@ export function Select({
   children,
   ...props
 }: SelectHTMLAttributes<HTMLSelectElement>) {
+  // `appearance-none` strips the native chevron, so one has to be drawn back in
+  // — without it every dropdown in the app looked like a plain text input.
   return (
-    <select className={cn(inputBase, "appearance-none pr-9", className)} {...props}>
-      {children}
-    </select>
+    <div className="relative">
+      <select
+        className={cn(inputBase, "cursor-pointer appearance-none pr-9", className)}
+        {...props}
+      >
+        {children}
+      </select>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 20 20"
+        fill="none"
+        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+      >
+        <path
+          d="M6 8l4 4 4-4"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
   );
 }
 
@@ -252,20 +341,55 @@ export function PageTitle({
   );
 }
 
+/**
+ * A titled block. Replaces four near-identical copies that had drifted across
+ * the employer job page, admin verifications, JobForm and OnboardingForm.
+ */
+export function Section({
+  title,
+  action,
+  className,
+  children,
+}: {
+  title: string;
+  /** Optional control rendered opposite the title (e.g. a "See all" link). */
+  action?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className={className}>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-muted">
+          {title}
+        </h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export function EmptyState({
   icon = "🌴",
   title,
   hint,
+  action,
 }: {
   icon?: string;
   title: string;
   hint?: string;
+  /** Optional CTA — an empty state that offers a next step beats a dead end. */
+  action?: ReactNode;
 }) {
   return (
     <div className="rounded-2xl border border-dashed border-border bg-surface/60 px-6 py-10 text-center">
-      <div className="text-3xl">{icon}</div>
+      <div aria-hidden="true" className="text-3xl">
+        {icon}
+      </div>
       <p className="mt-2 font-semibold text-slate-700">{title}</p>
       {hint ? <p className="mt-1 text-sm text-muted">{hint}</p> : null}
+      {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>
   );
 }

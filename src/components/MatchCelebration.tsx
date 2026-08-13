@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { Button } from "./ui";
+import { Button, ButtonLink } from "./ui";
 
 /** The "It's a Match" overlay shown on mutual interest (scope §13). */
 export function MatchCelebration({
@@ -25,11 +24,9 @@ export function MatchCelebration({
         <h2 className="mt-3 text-2xl font-extrabold text-brand">{title}</h2>
         {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
         <div className="mt-6 space-y-2">
-          <Link href={chatHref} className="block">
-            <Button size="lg" className="w-full">
-              Open chat 💬
-            </Button>
-          </Link>
+          <ButtonLink href={chatHref} size="lg" className="w-full">
+            Open chat 💬
+          </ButtonLink>
           {onClose && (
             <Button variant="ghost" className="w-full" onClick={onClose}>
               Later

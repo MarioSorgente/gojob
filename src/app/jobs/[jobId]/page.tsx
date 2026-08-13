@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { getJob } from "@/lib/repos/jobs";
 import { getSessionUser } from "@/lib/auth";
 import { formatSalaryRange } from "@/lib/cn";
-import { Badge, Button, Card } from "@/components/ui";
+import { Badge, ButtonLink, Card } from "@/components/ui";
 import { Logo } from "@/components/brand";
 
 export async function generateMetadata({
@@ -122,11 +122,9 @@ export default async function PublicJobPage({
 
       <div className="fixed inset-x-0 bottom-0 border-t border-border bg-surface/95 p-4 backdrop-blur">
         <div className="mx-auto max-w-md">
-          <Link href={applyHref}>
-            <Button size="lg" className="w-full">
-              Apply through GoJob →
-            </Button>
-          </Link>
+          <ButtonLink href={applyHref} size="lg" className="w-full">
+            Apply through GoJob →
+          </ButtonLink>
         </div>
       </div>
     </div>

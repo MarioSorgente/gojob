@@ -6,7 +6,7 @@
  * render these pages need the types.
  */
 
-import type { CandidateSummary, Job } from "./types";
+import type { CandidateSummary, Job, MatchBreakdown } from "./types";
 
 export interface CandidateResult {
   userId: string;
@@ -19,6 +19,8 @@ export interface JobResult {
   job: Job;
   score: number;
   reasons: string[];
+  /** Carried so the card's score can explain itself without another fetch. */
+  breakdown: MatchBreakdown;
 }
 
 export interface PagedResult<T> {

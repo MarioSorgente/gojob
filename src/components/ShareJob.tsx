@@ -88,7 +88,7 @@ export function ShareJob({
               </div>
               <button
                 onClick={() => setOpen(false)}
-                className="text-xl leading-none text-muted"
+                className="-m-2 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-xl leading-none text-muted outline-none transition-colors hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-brand/40"
                 aria-label="Close"
               >
                 ✕
@@ -107,7 +107,7 @@ export function ShareJob({
                 href={`https://wa.me/?text=${encodeURIComponent(message)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-semibold hover:bg-slate-50"
+                className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-semibold outline-none transition-colors hover:bg-slate-50 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-brand/40"
               >
                 💬 WhatsApp
               </a>
@@ -119,7 +119,7 @@ export function ShareJob({
                     show("Link copied — paste it in your Instagram bio or story");
                   }
                 }}
-                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-semibold hover:bg-slate-50"
+                className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-semibold outline-none transition-colors hover:bg-slate-50 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-brand/40"
               >
                 📷 Instagram
               </button>

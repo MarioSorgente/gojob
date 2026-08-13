@@ -4,7 +4,9 @@ import { requireRole } from "@/lib/auth";
 import { getJob } from "@/lib/repos/jobs";
 import { getShortlist } from "@/lib/repos/pipeline";
 import { formatSalaryRange } from "@/lib/cn";
-import { Badge, Card, EmptyState } from "@/components/ui";
+import { Badge, Card, EmptyState, Section } from "@/components/ui";
+import { MatchExplain } from "@/components/cards/MatchExplain";
+import { UnsaveButton } from "@/components/employer/UnsaveButton";
 import { ShareJob } from "@/components/ShareJob";
 import { SwipeDeck, type DeckCandidate } from "@/components/employer/SwipeDeck";
 import { ApplicantRow } from "@/components/employer/ApplicantRow";
@@ -46,6 +48,7 @@ export default async function EmployerJobDetail({
       summary: e.candidateSummary,
       score: e.score,
       reasons: e.reasons,
+      breakdown: e.breakdown,
     }));
 
   const applied = shortlist.filter(
@@ -111,44 +114,80 @@ export default async function EmployerJobDetail({
 
       {applied.length > 0 && (
         <Section title={`Applied to you (${applied.length})`}>
-          {applied.map((e) => (
-            <ApplicantRow
-              key={e.candidateId}
-              summary={e.candidateSummary}
-              score={e.score}
-              right={
-                <InviteButton
-                  jobId={jobId}
-                  candidateId={e.candidateId}
-                  name={e.candidateSummary.firstName}
-                />
-              }
-            />
-          ))}
+          <div className="space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
+            {applied.map((e) => (
+              <ApplicantRow
+                key={e.candidateId}
+                summary={e.candidateSummary}
+                scoreSlot={
+                  <MatchExplain
+                    score={e.score}
+                    breakdown={e.breakdown}
+                    reasons={e.reasons}
+                    audience="employer"
+                  />
+                }
+                right={
+                  <InviteButton
+                    jobId={jobId}
+                    candidateId={e.candidateId}
+                    name={e.candidateSummary.firstName}
+                  />
+                }
+              />
+            ))}
+          </div>
         </Section>
       )}
 
       {saved.length > 0 && (
-        <Section title={`Saved (${saved.length})`}>
-          {saved.map((e) => (
-            <ApplicantRow
-              key={e.candidateId}
-              summary={e.candidateSummary}
-              score={e.score}
-              right={
-                <InviteButton
-                  jobId={jobId}
-                  candidateId={e.candidateId}
-                  name={e.candidateSummary.firstName}
-                />
-              }
-            />
-          ))}
+        <Section
+          title={`Saved (${saved.length})`}
+          action={
+            <Link
+              href="/employer/shortlist"
+              className="rounded text-sm font-semibold text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              All saved
+            </Link>
+          }
+        >
+          <div className="space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
+            {saved.map((e) => (
+              <ApplicantRow
+                key={e.candidateId}
+                summary={e.candidateSummary}
+                scoreSlot={
+                  <MatchExplain
+                    score={e.score}
+                    breakdown={e.breakdown}
+                    reasons={e.reasons}
+                    audience="employer"
+                  />
+                }
+                right={
+                  <div className="flex flex-col gap-1.5">
+                    <InviteButton
+                      jobId={jobId}
+                      candidateId={e.candidateId}
+                      name={e.candidateSummary.firstName}
+                    />
+                    <UnsaveButton
+                      jobId={jobId}
+                      candidateId={e.candidateId}
+                      name={e.candidateSummary.firstName}
+                    />
+                  </div>
+                }
+              />
+            ))}
+          </div>
         </Section>
       )}
 
       {matched.length > 0 && (
         <Section title={`Matches (${matched.length})`}>
+          <div className="space-y-2">
           {matched.map((e) => (
             <ApplicantRow
               key={e.candidateId}
@@ -169,32 +208,25 @@ export default async function EmployerJobDetail({
               }
             />
           ))}
+          </div>
         </Section>
       )}
 
       {hired.length > 0 && (
         <Section title={`Hired (${hired.length})`}>
-          {hired.map((e) => (
-            <ApplicantRow
-              key={e.candidateId}
-              summary={e.candidateSummary}
-              score={e.score}
-              right={<span className="text-sm font-semibold text-success">✓ Hired</span>}
-            />
-          ))}
+          <div className="space-y-2">
+            {hired.map((e) => (
+              <ApplicantRow
+                key={e.candidateId}
+                summary={e.candidateSummary}
+                score={e.score}
+                right={<span className="text-sm font-semibold text-success">✓ Hired</span>}
+              />
+            ))}
+          </div>
         </Section>
       )}
     </div>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-muted">
-        {title}
-      </h2>
-      <div className="space-y-2">{children}</div>
-    </section>
-  );
-}

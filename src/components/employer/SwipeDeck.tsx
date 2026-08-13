@@ -3,16 +3,19 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { employerActionOnCandidate } from "@/app/employer/actions";
-import type { CandidateSummary } from "@/lib/types";
+import type { CandidateSummary, EmployerAction, MatchBreakdown } from "@/lib/types";
 import { CandidateCard } from "@/components/cards/CandidateCard";
 import { MatchCelebration } from "@/components/MatchCelebration";
 import { Button, EmptyState } from "@/components/ui";
+import { useToast } from "@/components/Toast";
 
 export interface DeckCandidate {
   candidateId: string;
   summary: CandidateSummary;
   score: number;
   reasons: string[];
+  /** Feeds the score explainer; already stored on every shortlist row. */
+  breakdown: MatchBreakdown;
 }
 
 export function SwipeDeck({
@@ -23,6 +26,7 @@ export function SwipeDeck({
   candidates: DeckCandidate[];
 }) {
   const router = useRouter();
+  const { show } = useToast();
   const [index, setIndex] = useState(0);
   const [pending, start] = useTransition();
   const [matchHref, setMatchHref] = useState<string | null>(null);
@@ -35,15 +39,23 @@ export function SwipeDeck({
 
   const current = candidates[index];
 
-  function act(action: "passed" | "saved" | "invited") {
+  function act(action: Exclude<EmployerAction, "none">) {
     if (!current) return;
     const cand = current;
     setDrag(0);
     start(async () => {
       const res = await employerActionOnCandidate(jobId, cand.candidateId, action);
+      if (res.error) {
+        // Keep the card in place — the action didn't happen.
+        show(res.error, "error");
+        return;
+      }
       if (action === "invited" && res.matched && res.conversationId) {
         setMatchName(`${cand.summary.firstName} ${cand.summary.lastName}`.trim());
         setMatchHref(`/employer/chat/${res.conversationId}`);
+      }
+      if (action === "saved") {
+        show(`${cand.summary.firstName} saved to your shortlist`, "success");
       }
       setIndex((i) => i + 1);
     });
@@ -120,6 +132,7 @@ export function SwipeDeck({
             summary={current.summary}
             score={current.score}
             reasons={current.reasons}
+            breakdown={current.breakdown}
           />
         </div>
       </div>

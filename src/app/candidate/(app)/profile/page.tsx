@@ -1,11 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { getCandidate } from "@/lib/repos/candidates";
 import { computeProfileStrength } from "@/lib/profileStrength";
 import { totalExperienceYears } from "@/lib/dates";
 import { formatSalaryRange } from "@/lib/cn";
-import { Avatar, Badge, Button, Card } from "@/components/ui";
+import { Avatar, Badge, ButtonLink, Card } from "@/components/ui";
 import { ProfileStrengthCard } from "@/components/candidate/ProfileStrengthCard";
 
 export default async function CandidateProfilePage() {
@@ -117,16 +116,12 @@ export default async function CandidateProfilePage() {
       </Card>
 
       <div className="grid grid-cols-2 gap-3">
-        <Link href="/candidate/edit">
-          <Button variant="outline" className="w-full">
-            Edit profile
-          </Button>
-        </Link>
-        <Link href="/candidate/verification">
-          <Button variant="outline" className="w-full">
-            Verification
-          </Button>
-        </Link>
+        <ButtonLink href="/candidate/edit" variant="outline" className="w-full">
+          Edit profile
+        </ButtonLink>
+        <ButtonLink href="/candidate/verification" variant="outline" className="w-full">
+          Verification
+        </ButtonLink>
       </div>
     </div>
   );

@@ -10,7 +10,7 @@ import {
   startPhoneSignIn,
 } from "@/lib/firebase/auth-client";
 import type { ConfirmationResult } from "firebase/auth";
-import { Button, Field, Input } from "@/components/ui";
+import { Button, Field, Input, interactive } from "@/components/ui";
 import { cn } from "@/lib/cn";
 
 type Method = "email" | "phone";
@@ -187,7 +187,16 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       </div>
 
       <Button variant="outline" size="lg" className="w-full" onClick={google} disabled={busy}>
-        <span className="text-base">🇬</span> Continue with Google
+        {/* An inline mark rather than the previous "🇬" — that's a lone regional
+            indicator, which renders as a hollow letter box on Windows and
+            Android instead of a G. */}
+        <svg aria-hidden="true" viewBox="0 0 18 18" className="h-4 w-4">
+          <path fill="#4285F4" d="M17.6 9.2c0-.6-.1-1.2-.2-1.8H9v3.5h4.8a4.1 4.1 0 0 1-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.6z" />
+          <path fill="#34A853" d="M9 18c2.4 0 4.5-.8 6-2.2l-2.9-2.2c-.8.5-1.8.9-3.1.9-2.4 0-4.4-1.6-5.1-3.8H.9v2.3A9 9 0 0 0 9 18z" />
+          <path fill="#FBBC05" d="M3.9 10.7a5.4 5.4 0 0 1 0-3.4V5H.9a9 9 0 0 0 0 8l3-2.3z" />
+          <path fill="#EA4335" d="M9 3.6c1.3 0 2.5.5 3.4 1.3L15 2.3A9 9 0 0 0 .9 5l3 2.3C4.6 5.2 6.6 3.6 9 3.6z" />
+        </svg>
+        Continue with Google
       </Button>
 
       {error && (
@@ -213,10 +222,15 @@ function MethodTab({
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
       className={cn(
-        "flex-1 rounded-lg py-2 text-sm font-semibold transition-colors",
-        active ? "bg-brand-soft text-brand-dark" : "bg-slate-100 text-slate-500",
+        "min-h-11 flex-1 rounded-lg px-3 text-sm font-semibold",
+        interactive,
+        active
+          ? "bg-brand-soft text-brand-dark"
+          : "bg-slate-100 text-slate-500 hover:bg-slate-200",
       )}
     >
       {children}
