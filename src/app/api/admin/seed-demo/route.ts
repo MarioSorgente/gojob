@@ -21,10 +21,20 @@ export const maxDuration = 60;
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb, getAdminApp } from "@/lib/firebase/admin";
-import { ensureIndexes } from "@/lib/demo/indexes";
-import { credentialSource, isEmulator, projectIdFromEnv } from "@/lib/firebase/credentials";
+import { ensureIndexes, indexHealth } from "@/lib/demo/indexes";
+import {
+  credentialSource,
+  isEmulator,
+  projectIdFromEnv,
+} from "@/lib/firebase/credentials";
 import { getSessionUser } from "@/lib/auth";
-import { grantRole, runReset, runSeed, runStatus, type DemoCtx } from "@/lib/demo/seed";
+import {
+  grantRole,
+  runReset,
+  runSeed,
+  runStatus,
+  type DemoCtx,
+} from "@/lib/demo/seed";
 
 const RESET_CONFIRMATION = "DELETE-DEMO-DATA";
 
@@ -61,7 +71,10 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as Record<string, unknown>;
   } catch {
-    return NextResponse.json({ error: "Expected a JSON body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Expected a JSON body" },
+      { status: 400 },
+    );
   }
 
   if (!(await authorized(body.token))) {
@@ -75,12 +88,15 @@ export async function POST(request: Request) {
   try {
     switch (action) {
       case "status": {
-        const result = await runStatus(ctx, {
-          projectId,
-          credentialSource: credentialSource(),
-          emulator: isEmulator(),
-        });
-        return NextResponse.json({ ok: true, action, ...result });
+        const [result, indexes] = await Promise.all([
+          runStatus(ctx, {
+            projectId,
+            credentialSource: credentialSource(),
+            emulator: isEmulator(),
+          }),
+          indexHealth(getAdminApp(), projectId),
+        ]);
+        return NextResponse.json({ ok: true, action, ...result, indexes });
       }
 
       case "seed": {
@@ -99,7 +115,9 @@ export async function POST(request: Request) {
       case "reset": {
         if (body.confirm !== RESET_CONFIRMATION) {
           return NextResponse.json(
-            { error: `Destructive action — send confirm: "${RESET_CONFIRMATION}"` },
+            {
+              error: `Destructive action — send confirm: "${RESET_CONFIRMATION}"`,
+            },
             { status: 400 },
           );
         }
@@ -110,7 +128,10 @@ export async function POST(request: Request) {
       case "grant-role": {
         const { email, role } = body;
         if (typeof email !== "string" || !email) {
-          return NextResponse.json({ error: "email is required" }, { status: 400 });
+          return NextResponse.json(
+            { error: "email is required" },
+            { status: 400 },
+          );
         }
         if (role !== "admin" && role !== "employer" && role !== "candidate") {
           return NextResponse.json(
@@ -136,7 +157,10 @@ export async function POST(request: Request) {
     // and it is already behind two gates.
     console.error(`seed-demo ${String(action)} failed`, error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error), projectId },
+      {
+        error: error instanceof Error ? error.message : String(error),
+        projectId,
+      },
       { status: 500 },
     );
   }

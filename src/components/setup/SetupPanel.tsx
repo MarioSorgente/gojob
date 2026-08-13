@@ -15,11 +15,27 @@ export function SetupPanel() {
   const [role, setRole] = useState("admin");
   const [busy, setBusy] = useState<Action | null>(null);
   const [result, setResult] = useState<string | null>(null);
+  const [indexHealth, setIndexHealth] = useState<{
+    databaseState: string;
+    indexes: Array<{
+      kind: string;
+      collectionGroup: string;
+      queryScope: string;
+      fields: Array<{
+        fieldPath: string;
+        order?: string;
+        arrayConfig?: string;
+      }>;
+      status: string;
+      detail?: string;
+    }>;
+  } | null>(null);
   const [failed, setFailed] = useState(false);
 
   async function run(action: Action, extra: Record<string, unknown> = {}) {
     setBusy(action);
     setResult(null);
+    setIndexHealth(null);
     try {
       const res = await fetch("/api/admin/seed-demo", {
         method: "POST",
@@ -29,7 +45,10 @@ export function SetupPanel() {
       const text = await res.text();
       let pretty = text;
       try {
-        pretty = JSON.stringify(JSON.parse(text), null, 2);
+        const parsed = JSON.parse(text) as { indexes?: typeof indexHealth };
+        pretty = JSON.stringify(parsed, null, 2);
+        if (action === "status" && parsed.indexes)
+          setIndexHealth(parsed.indexes);
       } catch {
         // Not JSON (e.g. a 404 from the feature flag) — show it raw.
       }
@@ -75,7 +94,11 @@ export function SetupPanel() {
           Actions
         </h2>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="outline" disabled={disabled} onClick={() => void run("status")}>
+          <Button
+            variant="outline"
+            disabled={disabled}
+            onClick={() => void run("status")}
+          >
             {busy === "status" ? "Checking…" : "Check status"}
           </Button>
           <Button
@@ -93,10 +116,10 @@ export function SetupPanel() {
           </Button>
         </div>
         <p className="mt-3 text-xs text-muted">
-          Check status first — it reports which Firebase project this deployment is
-          actually writing to. Then create indexes: several queries need them and
-          fail until they exist. Indexes build in the background and can take a
-          few minutes. Seeding is idempotent, so it is safe to re-run.
+          Check status first — it reports which Firebase project this deployment
+          is actually writing to. Then create indexes: several queries need them
+          and fail until they exist. Indexes build in the background and can
+          take a few minutes. Seeding is idempotent, so it is safe to re-run.
         </p>
       </Card>
 
@@ -143,6 +166,34 @@ export function SetupPanel() {
           <pre className="mt-2 max-h-96 overflow-auto rounded-xl bg-slate-50 p-3 text-xs leading-relaxed">
             {result}
           </pre>
+        </Card>
+      )}
+      {indexHealth && (
+        <Card className="p-4">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-muted">
+            Database indexes: {indexHealth.databaseState}
+          </h2>
+          <div className="mt-3 space-y-2 text-xs">
+            {indexHealth.indexes.map((index, position) => (
+              <div
+                key={`${index.kind}-${index.collectionGroup}-${position}`}
+                className="rounded-xl bg-slate-50 p-3"
+              >
+                <strong>{index.status}</strong>
+                {" — "}
+                {index.collectionGroup} [{index.queryScope}]:{" "}
+                {index.fields
+                  .map(
+                    (field) =>
+                      `${field.fieldPath} (${field.order ?? field.arrayConfig})`,
+                  )
+                  .join(" + ")}
+                {index.detail && (
+                  <div className="mt-1 text-red-700">{index.detail}</div>
+                )}
+              </div>
+            ))}
+          </div>
         </Card>
       )}
     </div>
