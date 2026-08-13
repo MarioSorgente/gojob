@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createFakeFirestore, type FakeFirestore } from "./testing/fakeFirestore";
+import {
+  createFakeFirestore,
+  type FakeFirestore,
+} from "./testing/fakeFirestore";
 import { computeProfileStrength } from "../profileStrength";
 import type { CandidateProfile, Job, JobCandidate } from "../types";
 
@@ -33,6 +36,7 @@ const {
   ensureShortlistEntry,
   getJobCandidate,
   getShortlist,
+  getShortlistPage,
   listCandidateApplications,
   listCandidateInvitations,
   markHired,
@@ -68,7 +72,9 @@ function makeJob(overrides: Partial<Job> = {}): Job {
   };
 }
 
-function makeCandidate(overrides: Partial<CandidateProfile> = {}): CandidateProfile {
+function makeCandidate(
+  overrides: Partial<CandidateProfile> = {},
+): CandidateProfile {
   const profile: CandidateProfile = {
     userId: CANDIDATE,
     firstName: "Ayu",
@@ -96,7 +102,11 @@ function makeCandidate(overrides: Partial<CandidateProfile> = {}): CandidateProf
       },
     ],
     profileStrength: 0,
-    verification: { phone: "verified", id: "verified", employment: "not_submitted" },
+    verification: {
+      phone: "verified",
+      id: "verified",
+      employment: "not_submitted",
+    },
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
@@ -145,7 +155,9 @@ describe("ensureShortlistEntry", () => {
   });
 
   it("refuses when the job or candidate is missing", async () => {
-    await expect(ensureShortlistEntry("nope", CANDIDATE)).rejects.toThrow("Job not found");
+    await expect(ensureShortlistEntry("nope", CANDIDATE)).rejects.toThrow(
+      "Job not found",
+    );
     await seed();
     await expect(ensureShortlistEntry(JOB_ID, "ghost")).rejects.toThrow(
       "Candidate not found",
@@ -204,7 +216,9 @@ describe("candidateApply", () => {
     expect(row.stage).toBe("matched");
     expect(row.matchId).toBe(result.matchId);
 
-    const conversation = db.docs.get(`conversations/${result.conversationId}`) as {
+    const conversation = db.docs.get(
+      `conversations/${result.conversationId}`,
+    ) as {
       participants: string[];
       unread: Record<string, number>;
     };
@@ -215,7 +229,11 @@ describe("candidateApply", () => {
 
   it("is idempotent — applying twice creates one match, not two", async () => {
     await seed();
-    await setEmployerAction(JOB_ID, await ensureShortlistEntry(JOB_ID, CANDIDATE).then(() => CANDIDATE), "invited");
+    await setEmployerAction(
+      JOB_ID,
+      await ensureShortlistEntry(JOB_ID, CANDIDATE).then(() => CANDIDATE),
+      "invited",
+    );
 
     const first = await candidateApply(JOB_ID, CANDIDATE);
     const second = await candidateApply(JOB_ID, CANDIDATE);
@@ -428,13 +446,19 @@ describe("candidate-facing queries", () => {
     await candidateApply("job-2", CANDIDATE);
 
     const applications = await listCandidateApplications(CANDIDATE);
-    expect(applications.map((a) => a.job.id).sort()).toEqual(["job-1", "job-2"]);
+    expect(applications.map((a) => a.job.id).sort()).toEqual([
+      "job-1",
+      "job-2",
+    ]);
   });
 
   it("does not leak another candidate's rows", async () => {
     await seed();
     const other = makeCandidate({ userId: "cand-2", firstName: "Wayan" });
-    db.docs.set(`candidates/${other.userId}`, other as unknown as Record<string, unknown>);
+    db.docs.set(
+      `candidates/${other.userId}`,
+      other as unknown as Record<string, unknown>,
+    );
 
     await candidateApply(JOB_ID, CANDIDATE);
     await candidateApply(JOB_ID, "cand-2");
@@ -458,7 +482,10 @@ describe("candidate-facing queries", () => {
         employment: "not_submitted",
       },
     });
-    db.docs.set(`candidates/${weak.userId}`, weak as unknown as Record<string, unknown>);
+    db.docs.set(
+      `candidates/${weak.userId}`,
+      weak as unknown as Record<string, unknown>,
+    );
 
     await ensureShortlistEntry(JOB_ID, CANDIDATE);
     await ensureShortlistEntry(JOB_ID, "cand-weak");
@@ -466,5 +493,69 @@ describe("candidate-facing queries", () => {
     const ranked = await getShortlist(JOB_ID);
     expect(ranked[0].candidateId).toBe(CANDIDATE);
     expect(ranked[0].score).toBeGreaterThan(ranked[1].score);
+  });
+});
+
+describe("getShortlistPage", () => {
+  async function shortlistRows(rows: Array<{ id: string; score?: number }>) {
+    await seed();
+    await ensureShortlistEntry(JOB_ID, CANDIDATE);
+    const template = db.docs.get(`jobs/${JOB_ID}/shortlist/${CANDIDATE}`)!;
+    db.docs.delete(`jobs/${JOB_ID}/shortlist/${CANDIDATE}`);
+    for (const row of rows) {
+      const data = structuredClone(template);
+      data.candidateId = row.id;
+      if (row.score === undefined) delete data.score;
+      else data.score = row.score;
+      db.docs.set(`jobs/${JOB_ID}/shortlist/${row.id}`, data);
+    }
+  }
+
+  it("orders by descending score and document id for equal scores", async () => {
+    await shortlistRows([
+      { id: "alpha", score: 80 },
+      { id: "charlie", score: 80 },
+      { id: "bravo", score: 95 },
+    ]);
+    const page = await getShortlistPage(JOB_ID, null, 10);
+    expect(page.items.map((item) => item.candidateId)).toEqual([
+      "bravo",
+      "charlie",
+      "alpha",
+    ]);
+  });
+
+  it("continues at the page boundary without gaps or duplicates", async () => {
+    await shortlistRows([
+      { id: "a", score: 90 },
+      { id: "b", score: 80 },
+      { id: "c", score: 80 },
+      { id: "d", score: 70 },
+      { id: "e", score: 60 },
+    ]);
+    const first = await getShortlistPage(JOB_ID, null, 2);
+    const second = await getShortlistPage(JOB_ID, first.nextCursor, 2);
+    const third = await getShortlistPage(JOB_ID, second.nextCursor, 2);
+    expect(first.items.map((item) => item.candidateId)).toEqual(["a", "c"]);
+    expect(second.items.map((item) => item.candidateId)).toEqual(["b", "d"]);
+    expect(third.items.map((item) => item.candidateId)).toEqual(["e"]);
+    expect(third.nextCursor).toBeNull();
+  });
+
+  it("returns an empty terminal page", async () => {
+    expect(await getShortlistPage(JOB_ID, null, 5)).toEqual({
+      items: [],
+      nextCursor: null,
+    });
+  });
+
+  it("repairs legacy rows with missing scores inside a bounded window", async () => {
+    await shortlistRows([{ id: "legacy" }, { id: "scored", score: 50 }]);
+    const page = await getShortlistPage(JOB_ID, null, 10);
+    expect(page.items.map((item) => [item.candidateId, item.score])).toEqual([
+      ["scored", 50],
+      ["legacy", 0],
+    ]);
+    expect(db.docs.get(`jobs/${JOB_ID}/shortlist/legacy`)?.score).toBe(0);
   });
 });
