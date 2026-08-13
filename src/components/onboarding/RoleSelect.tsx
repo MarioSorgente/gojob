@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { setRoleAction } from "@/app/onboarding/actions";
-import type { UserRole } from "@/lib/types";
 import { interactive } from "@/components/ui";
 import { cn } from "@/lib/cn";
 
+type SelfServiceUserRole = "candidate" | "employer";
+
 const OPTIONS: {
-  role: Exclude<UserRole, "admin">;
+  role: SelfServiceUserRole;
   icon: string;
   title: string;
   text: string;
@@ -33,12 +34,12 @@ export function RoleSelect({
   preselect?: string;
   next?: string;
 }) {
-  const [selected, setSelected] = useState<UserRole | null>(
+  const [selected, setSelected] = useState<SelfServiceUserRole | null>(
     preselect === "employer" || preselect === "candidate" ? preselect : null,
   );
   const [pending, startTransition] = useTransition();
 
-  function choose(role: UserRole) {
+  function choose(role: SelfServiceUserRole) {
     setSelected(role);
     startTransition(() => setRoleAction(role, next));
   }
@@ -69,7 +70,9 @@ export function RoleSelect({
         </button>
       ))}
       {pending && (
-        <p className="text-center text-sm text-muted">Setting up your account…</p>
+        <p className="text-center text-sm text-muted">
+          Setting up your account…
+        </p>
       )}
     </div>
   );

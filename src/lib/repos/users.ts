@@ -1,7 +1,9 @@
 import "server-only";
 import { adminDb } from "../firebase/admin";
 import { COLLECTIONS } from "../collections";
-import type { AppUser, UserRole } from "../types";
+import type { AppUser } from "../types";
+
+export type SelfServiceUserRole = "candidate" | "employer";
 
 const col = () => adminDb().collection(COLLECTIONS.users);
 
@@ -14,7 +16,11 @@ export async function getUser(uid: string): Promise<AppUser | null> {
 /** Create the user doc on first sign-in if it does not exist yet. */
 export async function ensureUser(
   uid: string,
-  info: { email: string | null; phone: string | null; displayName: string | null },
+  info: {
+    email: string | null;
+    phone: string | null;
+    displayName: string | null;
+  },
 ): Promise<AppUser> {
   const ref = col().doc(uid);
   const snap = await ref.get();
@@ -33,7 +39,20 @@ export async function ensureUser(
   return { uid, ...user };
 }
 
-export async function setUserRole(uid: string, role: UserRole): Promise<void> {
+/**
+ * Assign a role selected during self-service onboarding.
+ *
+ * Administrative role assignment deliberately does not live in this general
+ * user repository. It must be implemented behind an already-authorized admin
+ * action or a controlled provisioning tool.
+ */
+export async function setSelfServiceUserRole(
+  uid: string,
+  role: SelfServiceUserRole,
+): Promise<void> {
+  if (role !== "candidate" && role !== "employer") {
+    throw new Error("Invalid self-service user role");
+  }
   await col().doc(uid).set({ role }, { merge: true });
 }
 
