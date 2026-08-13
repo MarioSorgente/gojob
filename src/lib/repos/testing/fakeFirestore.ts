@@ -8,7 +8,7 @@
  *
  * So this implements just the surface the repos actually use. It is a test
  * double, not a Firestore implementation: it deliberately does not model
- * transactions, index requirements or concurrency. What it does model
+ * index requirements. What it does model
  * faithfully is document identity, merge-vs-replace writes, and collection
  * groups — the semantics the pipeline's correctness depends on.
  */
@@ -79,6 +79,7 @@ function mergeInto(target: Data, patch: Data): Data {
 export class FakeFirestore {
   /** Full document path -> data, e.g. "jobs/j1/shortlist/c1". */
   readonly docs = new Map<string, Data>();
+  private transactionTail: Promise<void> = Promise.resolve();
 
   collection(name: string): FakeCollectionRef {
     return new FakeCollectionRef(this, name);
@@ -96,6 +97,23 @@ export class FakeFirestore {
     return new FakeBatch(this);
   }
 
+  async runTransaction<T>(
+    update: (transaction: FakeTransaction) => Promise<T>,
+  ): Promise<T> {
+    const previous = this.transactionTail;
+    let release!: () => void;
+    this.transactionTail = new Promise<void>((resolve) => (release = resolve));
+    await previous;
+    try {
+      const transaction = new FakeTransaction(this);
+      const result = await update(transaction);
+      await transaction.commit();
+      return result;
+    } finally {
+      release();
+    }
+  }
+
   /** Test helper: every document directly under a collection path. */
   dump(collectionPath: string): { id: string; data: Data }[] {
     return [...this.docs.entries()]
@@ -104,6 +122,25 @@ export class FakeFirestore {
         return segments.slice(0, -1).join("/") === collectionPath;
       })
       .map(([path, data]) => ({ id: path.split("/").pop()!, data }));
+  }
+}
+
+class FakeTransaction {
+  private readonly ops: (() => Promise<void>)[] = [];
+
+  constructor(private readonly db: FakeFirestore) {}
+
+  get(ref: FakeDocRef) {
+    return ref.get();
+  }
+
+  set(ref: FakeDocRef, data: Data, options?: { merge?: boolean }) {
+    this.ops.push(() => ref.set(data, options));
+    return this;
+  }
+
+  async commit() {
+    for (const op of this.ops) await op();
   }
 }
 
