@@ -1,6 +1,7 @@
 import "server-only";
 import { adminDb } from "../firebase/admin";
 import { COLLECTIONS } from "../collections";
+import { withIndexFallback } from "../firestoreErrors";
 import { getJob } from "./jobs";
 import type { Job, JobCandidate } from "../types";
 
@@ -33,7 +34,9 @@ function savedQuery(businessId: string) {
  * Count of saved candidates, for the nav badge. A real aggregation — it never
  * transfers the documents.
  */
-export async function countSavedForBusiness(businessId: string): Promise<number> {
+export async function countSavedForBusiness(
+  businessId: string,
+): Promise<number> {
   try {
     const snap = await savedQuery(businessId).count().get();
     return snap.data().count;
@@ -54,14 +57,41 @@ export async function countSavedForBusiness(businessId: string): Promise<number>
 export async function listSavedForBusiness(
   businessId: string,
 ): Promise<SavedCandidate[]> {
-  const snap = await savedQuery(businessId).get();
+  const entries = await withIndexFallback(
+    "listSavedForBusiness",
+    async () => {
+      const snap = await savedQuery(businessId).get();
+      return snap.docs.map((d) => d.data() as JobCandidate);
+    },
+    async () => {
+      // The collection-group query needs a composite index. Until it has been
+      // deployed and built, read only this business's jobs and query each
+      // job-local shortlist, which is covered by Firestore's single-field
+      // indexes and keeps the page available.
+      const jobsSnap = await adminDb()
+        .collection(COLLECTIONS.jobs)
+        .where("businessId", "==", businessId)
+        .get();
+      const snapshots = await Promise.all(
+        jobsSnap.docs.map((job) =>
+          job.ref
+            .collection(COLLECTIONS.shortlist)
+            .where("employerAction", "==", "saved")
+            .get(),
+        ),
+      );
+      return snapshots.flatMap((snap) =>
+        snap.docs.map((doc) => doc.data() as JobCandidate),
+      );
+    },
+  );
 
-  const entries = snap.docs
-    .map((d) => d.data() as JobCandidate)
-    .filter((e) => !e.matchId && e.stage !== "rejected" && e.stage !== "hired");
+  const visibleEntries = entries.filter(
+    (e) => !e.matchId && e.stage !== "rejected" && e.stage !== "hired",
+  );
 
   // One read per distinct job, not per row.
-  const jobIds = [...new Set(entries.map((e) => e.jobId))];
+  const jobIds = [...new Set(visibleEntries.map((e) => e.jobId))];
   const jobs = new Map<string, Job>();
   await Promise.all(
     jobIds.map(async (id) => {
@@ -70,7 +100,7 @@ export async function listSavedForBusiness(
     }),
   );
 
-  return entries
+  return visibleEntries
     .map((entry) => {
       const job = jobs.get(entry.jobId);
       return job ? { entry, job } : null;
