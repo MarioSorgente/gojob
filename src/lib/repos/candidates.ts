@@ -4,6 +4,7 @@ import { COLLECTIONS } from "../collections";
 import { computeProfileStrength } from "../profileStrength";
 import { totalExperienceYears } from "../dates";
 import { candidateMatchesFilters, type CandidateFilters } from "../search";
+import { withIndexFallback } from "../firestoreErrors";
 import {
   PAGE_SIZE,
   decodeCursor,
@@ -81,7 +82,10 @@ export async function setCandidateVerification(
   const ref = col().doc(uid);
   await ref.set({ verification: { [field]: status } }, { merge: true });
   const updated = (await ref.get()).data() as CandidateProfile;
-  await ref.set({ profileStrength: computeProfileStrength(updated).percent }, { merge: true });
+  await ref.set(
+    { profileStrength: computeProfileStrength(updated).percent },
+    { merge: true },
+  );
 }
 
 /** Candidates whose desired roles include `role` (the matching engine pool). */
@@ -100,6 +104,13 @@ export async function listAllCandidates(): Promise<CandidateProfile[]> {
 interface CandidateCursor {
   strength: number;
   id: string;
+}
+
+function candidateCursor(candidate: CandidateProfile): string {
+  return encodeCursor<CandidateCursor>({
+    strength: candidate.profileStrength ?? 0,
+    id: candidate.userId,
+  });
 }
 
 /**
@@ -121,35 +132,66 @@ export async function searchCandidatesPage(
 ): Promise<Page<CandidateProfile>> {
   const residual: CandidateFilters = { ...filters, role: undefined };
 
-  return paginateFiltered<CandidateProfile>({
-    startCursor: cursor,
-    pageSize,
-    keep: (c) => candidateMatchesFilters(c, residual),
-    cursorOf: (c) =>
-      encodeCursor<CandidateCursor>({
-        strength: c.profileStrength ?? 0,
-        id: c.userId,
+  return withIndexFallback(
+    "searchCandidatesPage",
+    () =>
+      paginateFiltered<CandidateProfile>({
+        startCursor: cursor,
+        pageSize,
+        keep: (c) => candidateMatchesFilters(c, residual),
+        cursorOf: candidateCursor,
+        fetchBatch: async (after, limit) => {
+          const base = filters.role
+            ? col().where("roles", "array-contains", filters.role)
+            : col();
+
+          // Tie-break on userId: without a unique final sort key, documents sharing
+          // a profileStrength can repeat or disappear across page boundaries.
+          let q = base
+            .orderBy("profileStrength", "desc")
+            .orderBy("userId", "desc");
+
+          const start = decodeCursor<CandidateCursor>(after);
+          if (start) q = q.startAfter(start.strength, start.id);
+
+          const snap = await q.limit(limit).get();
+          return snap.docs.map((d) => d.data() as CandidateProfile);
+        },
       }),
-    fetchBatch: async (after, limit) => {
-      const base = filters.role
-        ? col().where("roles", "array-contains", filters.role)
-        : col();
-
-      // Tie-break on userId: without a unique final sort key, documents sharing
-      // a profileStrength can repeat or disappear across page boundaries.
-      let q = base
-        .orderBy("profileStrength", "desc")
-        .orderBy("userId", "desc");
-
-      const start = decodeCursor<CandidateCursor>(after);
-      if (start) q = q.startAfter(start.strength, start.id);
-
-      const snap = await q.limit(limit).get();
-      return snap.docs.map((d) => d.data() as CandidateProfile);
+    async () => {
+      // Both candidate query shapes need composite indexes. Keep Find usable
+      // while a new environment's indexes are deploying by doing the same
+      // filtering and ordering in memory. This is intentionally only the
+      // missing-index path; normal traffic remains cursor-paged in Firestore.
+      const candidates = (await listAllCandidates())
+        .filter((candidate) => candidateMatchesFilters(candidate, filters))
+        .sort(
+          (a, b) =>
+            (b.profileStrength ?? 0) - (a.profileStrength ?? 0) ||
+            b.userId.localeCompare(a.userId),
+        );
+      const start = decodeCursor<CandidateCursor>(cursor);
+      const offset = start
+        ? candidates.findIndex(
+            (candidate) =>
+              (candidate.profileStrength ?? 0) === start.strength &&
+              candidate.userId === start.id,
+          ) + 1
+        : 0;
+      // A stale/tampered cursor that is not in the result set restarts safely.
+      const safeOffset = offset > 0 ? offset : 0;
+      const items = candidates.slice(safeOffset, safeOffset + pageSize);
+      const next = safeOffset + items.length;
+      return {
+        items,
+        nextCursor:
+          next < candidates.length && items.length > 0
+            ? candidateCursor(items[items.length - 1])
+            : null,
+      };
     },
-  });
+  );
 }
-
 
 /** Build the compact card summary denormalized onto shortlist docs. */
 export function toCandidateSummary(c: CandidateProfile): CandidateSummary {
