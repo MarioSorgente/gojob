@@ -10,7 +10,7 @@ import {
   respondToInterview,
   sendMessage,
 } from "@/lib/repos/chat";
-import type { Conversation } from "@/lib/types";
+import type { Conversation, Message } from "@/lib/types";
 
 async function assertParticipant(
   conversationId: string,
@@ -26,6 +26,8 @@ async function assertParticipant(
 export interface SendMessageResult {
   /** Set when the message was refused — shown to the sender verbatim. */
   error?: string;
+  /** Lets the sender render immediately even when realtime auth is still restoring. */
+  message?: Message;
 }
 
 export async function sendMessageAction(
@@ -39,8 +41,8 @@ export async function sendMessageAction(
   const limited = await checkRateLimit(user.uid, "message");
   if (limited) return { error: limited };
 
-  await sendMessage(conversationId, user.uid, body);
-  return {};
+  const message = await sendMessage(conversationId, user.uid, body);
+  return { message };
 }
 
 export async function markReadAction(conversationId: string) {
