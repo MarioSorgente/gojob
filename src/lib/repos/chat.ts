@@ -1,8 +1,14 @@
 import "server-only";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldPath, FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "../firebase/admin";
 import { COLLECTIONS } from "../collections";
 import type { Conversation, Interview, Message } from "../types";
+import {
+  decodeCursor,
+  encodeCursor,
+  PAGE_SIZE,
+  type Page,
+} from "../pagination";
 
 const conversationsCol = () => adminDb().collection(COLLECTIONS.conversations);
 const messagesCol = (conversationId: string) =>
@@ -19,15 +25,41 @@ export async function getConversation(
 
 export async function listConversationsForUser(
   uid: string,
-): Promise<Conversation[]> {
-  const snap = await conversationsCol()
+  cursor: string | null = null,
+  pageSize = PAGE_SIZE,
+): Promise<Page<Conversation>> {
+  const size =
+    Number.isInteger(pageSize) && pageSize > 0
+      ? Math.min(pageSize, 100)
+      : PAGE_SIZE;
+  let query = conversationsCol()
     .where("participants", "array-contains", uid)
-    .get();
-  return snap.docs
-    .map((d) => ({ id: d.id, ...(d.data() as Omit<Conversation, "id">) }))
-    .sort((a, b) =>
-      (b.lastMessageAt ?? b.createdAt).localeCompare(a.lastMessageAt ?? a.createdAt),
-    );
+    .orderBy("activityAt", "desc")
+    .orderBy(FieldPath.documentId(), "desc");
+  const start = decodeCursor<{ activityAt: string; id: string }>(cursor);
+  if (
+    start &&
+    typeof start.activityAt === "string" &&
+    typeof start.id === "string"
+  ) {
+    query = query.startAfter(start.activityAt, start.id);
+  }
+  const snap = await query.limit(size + 1).get();
+  const docs = snap.docs.slice(0, size);
+  const last = docs.at(-1);
+  return {
+    items: docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Omit<Conversation, "id">),
+    })),
+    nextCursor:
+      snap.docs.length > size && last
+        ? encodeCursor({
+            activityAt: last.data().activityAt as string,
+            id: last.id,
+          })
+        : null,
+  };
 }
 
 /**
@@ -46,14 +78,21 @@ export async function countUnreadForUser(uid: string): Promise<number> {
     .get();
 
   return snap.docs.reduce((total, doc) => {
-    const value = (doc.data() as { unread?: Record<string, number> }).unread?.[uid];
+    const value = (doc.data() as { unread?: Record<string, number> }).unread?.[
+      uid
+    ];
     return total + (typeof value === "number" ? value : 0);
   }, 0);
 }
 
 export async function getMessages(conversationId: string): Promise<Message[]> {
-  const snap = await messagesCol(conversationId).orderBy("createdAt", "asc").get();
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Message, "id">) }));
+  const snap = await messagesCol(conversationId)
+    .orderBy("createdAt", "asc")
+    .get();
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<Message, "id">),
+  }));
 }
 
 /**
@@ -89,6 +128,7 @@ export async function sendMessage(
   const update: Record<string, unknown> = {
     lastMessage: message.body.slice(0, 140),
     lastMessageAt: now,
+    activityAt: now,
   };
   if (recipient) update[`unread.${recipient}`] = FieldValue.increment(1);
 
@@ -113,17 +153,15 @@ export async function markConversationRead(
 // Interviews (scope §15)
 // ---------------------------------------------------------------------------
 
-export async function proposeInterview(
-  params: {
-    conversationId: string;
-    matchId: string;
-    jobId: string;
-    proposedBy: string;
-    date: string;
-    time: string;
-    location: string;
-  },
-): Promise<Interview> {
+export async function proposeInterview(params: {
+  conversationId: string;
+  matchId: string;
+  jobId: string;
+  proposedBy: string;
+  date: string;
+  time: string;
+  location: string;
+}): Promise<Interview> {
   const now = new Date().toISOString();
   const ref = interviewsCol().doc();
   const interview: Omit<Interview, "id"> = {

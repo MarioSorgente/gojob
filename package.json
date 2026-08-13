@@ -14,6 +14,8 @@
     "emulators": "npx --yes firebase-tools emulators:start --project demo-gojob",
     "seed": "tsx scripts/seed.ts",
     "seed:prod": "tsx scripts/seed.ts --prod",
+    "migrate:conversation-activity": "tsx scripts/backfill-conversation-activity.ts",
+    "migrate:conversation-activity:prod": "tsx scripts/backfill-conversation-activity.ts --prod",
     "format": "prettier --write ."
   },
   "overrides": {
