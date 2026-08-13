@@ -8,13 +8,16 @@ import type { NavItem } from "./navigation";
 /**
  * The candidate and employer app shell.
  *
- * Two layouts driven purely by CSS breakpoints — no device detection, so it
+ * Three responsive tiers driven purely by CSS breakpoints — no device detection, so it
  * responds to window resizing and split-screen, and every page stays cacheable:
  *
- *   < md   phone: sticky TopBar + fixed BottomNav, single 448px column
- *   >= md  desktop: persistent left sidebar, no bottom bar, wide content
+ *   < md       phone: sticky TopBar + fixed BottomNav, single 448px column
+ *   md to lg   tablet: persistent sidebar, no bottom bar, single-column content
+ *   >= lg      wide desktop: sidebar plus multi-column content where pages opt in
  *
- * Both get the same NavItem[], so the two navigations cannot drift apart.
+ * The first breakpoint changes navigation only; delaying content columns until
+ * lg leaves enough width beside the 240px sidebar for useful card widths. Both
+ * navigations get the same NavItem[], so they cannot drift apart.
  */
 export function AppShell({
   items,

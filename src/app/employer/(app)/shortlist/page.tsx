@@ -66,7 +66,7 @@ export default async function ShortlistPage() {
                 </Link>
               }
             >
-              <div className="space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
+              <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
                 {rows.map(({ entry }) => (
                   <ApplicantRow
                     key={`${jobId}-${entry.candidateId}`}

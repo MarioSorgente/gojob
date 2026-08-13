@@ -114,7 +114,7 @@ export default async function EmployerJobDetail({
 
       {applied.length > 0 && (
         <Section title={`Applied to you (${applied.length})`}>
-          <div className="space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
+          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
             {applied.map((e) => (
               <ApplicantRow
                 key={e.candidateId}
@@ -152,7 +152,7 @@ export default async function EmployerJobDetail({
             </Link>
           }
         >
-          <div className="space-y-2 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
+          <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
             {saved.map((e) => (
               <ApplicantRow
                 key={e.candidateId}
@@ -229,4 +229,3 @@ export default async function EmployerJobDetail({
     </div>
   );
 }
-

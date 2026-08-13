@@ -32,7 +32,7 @@ export default async function EmployerDashboard() {
         + Post a Job
       </ButtonLink>
 
-      <div className="mt-5 space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0 lg:grid-cols-3">
+      <div className="mt-5 space-y-3 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-3">
         {withStats.length === 0 ? (
           <EmptyState
             icon="📋"
