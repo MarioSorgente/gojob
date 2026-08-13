@@ -31,45 +31,73 @@ export interface MarketplaceMetrics {
 
 export async function getMarketplaceMetrics(): Promise<MarketplaceMetrics> {
   const db = adminDb();
-  const [usersSnap, candidatesSnap, businessesSnap, jobsSnap, matchesSnap, hiresSnap] =
-    await Promise.all([
-      db.collection(COLLECTIONS.users).get(),
-      db.collection(COLLECTIONS.candidates).get(),
-      db.collection(COLLECTIONS.businesses).get(),
-      db.collection(COLLECTIONS.jobs).get(),
-      db.collection(COLLECTIONS.matches).get(),
-      db.collection(COLLECTIONS.hires).get(),
-    ]);
+  const count = async (query: FirebaseFirestore.Query) =>
+    (await query.count().get()).data().count;
 
-  const users = usersSnap.docs.map((d) => d.data() as AppUser);
-  const candidates = candidatesSnap.docs.map((d) => d.data() as CandidateProfile);
-  const businesses = businessesSnap.docs.map((d) => d.data() as Business);
-  const jobs = jobsSnap.docs.map((d) => d.data() as Job);
-
-  // Applications/invitations live on the per-job shortlist subcollections.
-  const shortlistSnap = await db.collectionGroup(COLLECTIONS.shortlist).get();
-  const entries = shortlistSnap.docs.map((d) => d.data() as { candidateAction?: string; employerAction?: string });
-
-  const liveJobs = jobs.filter((j) => j.status === "live").length;
-  const matches = matchesSnap.size;
+  // Aggregation queries are billed by index entries and do not download every
+  // source document. Applications and invitations can also be counted directly:
+  // their fields are indexed at collection-group scope in firestore.indexes.json.
+  const [
+    candidates,
+    employers,
+    businesses,
+    verifiedBusinesses,
+    jobs,
+    liveJobs,
+    applications,
+    invitations,
+    matches,
+    hires,
+    pendingIdVerifications,
+    pendingBusinessVerifications,
+  ] = await Promise.all([
+    count(db.collection(COLLECTIONS.candidates)),
+    count(db.collection(COLLECTIONS.users).where("role", "==", "employer")),
+    count(db.collection(COLLECTIONS.businesses)),
+    count(
+      db
+        .collection(COLLECTIONS.businesses)
+        .where("verificationStatus", "==", "verified"),
+    ),
+    count(db.collection(COLLECTIONS.jobs)),
+    count(db.collection(COLLECTIONS.jobs).where("status", "==", "live")),
+    count(
+      db
+        .collectionGroup(COLLECTIONS.shortlist)
+        .where("candidateAction", "==", "applied"),
+    ),
+    count(
+      db
+        .collectionGroup(COLLECTIONS.shortlist)
+        .where("employerAction", "==", "invited"),
+    ),
+    count(db.collection(COLLECTIONS.matches)),
+    count(db.collection(COLLECTIONS.hires)),
+    count(
+      db
+        .collection(COLLECTIONS.candidates)
+        .where("verification.id", "==", "pending"),
+    ),
+    count(
+      db
+        .collection(COLLECTIONS.businesses)
+        .where("verificationStatus", "==", "pending"),
+    ),
+  ]);
 
   return {
-    candidates: candidates.length,
-    employers: users.filter((u) => u.role === "employer").length,
-    businesses: businesses.length,
-    verifiedBusinesses: businesses.filter((b) => b.verificationStatus === "verified")
-      .length,
-    jobs: jobs.length,
+    candidates,
+    employers,
+    businesses,
+    verifiedBusinesses,
+    jobs,
     liveJobs,
-    applications: entries.filter((e) => e.candidateAction === "applied").length,
-    invitations: entries.filter((e) => e.employerAction === "invited").length,
+    applications,
+    invitations,
     matches,
-    hires: hiresSnap.size,
-    pendingIdVerifications: candidates.filter((c) => c.verification?.id === "pending")
-      .length,
-    pendingBusinessVerifications: businesses.filter(
-      (b) => b.verificationStatus === "pending",
-    ).length,
+    hires,
+    pendingIdVerifications,
+    pendingBusinessVerifications,
     matchesPerLiveJob: liveJobs ? Number((matches / liveJobs).toFixed(1)) : 0,
   };
 }
