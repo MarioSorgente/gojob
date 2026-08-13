@@ -3,9 +3,12 @@
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { randomUUID } from "node:crypto";
-import { getSessionUser } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { markOnboardingComplete } from "@/lib/repos/users";
-import { setCandidateVerification, upsertCandidate } from "@/lib/repos/candidates";
+import {
+  setCandidateVerification,
+  upsertCandidate,
+} from "@/lib/repos/candidates";
 import { resyncCandidateShortlistsQuietly } from "@/lib/repos/rematch";
 import { safeNextPath } from "@/lib/nextPath";
 import type { CandidateOnboardingInput } from "@/lib/forms";
@@ -15,8 +18,7 @@ export async function saveCandidateProfile(
   input: CandidateOnboardingInput,
   next?: string,
 ) {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
+  const user = await requireRole("candidate");
 
   const experiences: Experience[] = input.experiences
     .filter((e) => e.companyName.trim() || e.role.trim())
