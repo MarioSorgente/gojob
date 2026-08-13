@@ -2,7 +2,9 @@ import "server-only";
 import { adminDb } from "../firebase/admin";
 import { COLLECTIONS } from "../collections";
 import { chunk } from "../chunk";
+import { withIndexFallback } from "../firestoreErrors";
 import { computeMatch } from "../matching";
+import { candidateEntries } from "./pipeline";
 import { toCandidateSummary } from "./candidates";
 import type { CandidateProfile, Job, JobCandidate } from "../types";
 
@@ -35,11 +37,23 @@ async function liveJobsForRoles(roles: string[]): Promise<Job[]> {
   const wanted = [...new Set(roles.filter(Boolean))].slice(0, MAX_IN_VALUES);
   if (wanted.length === 0) return [];
 
-  const snap = await jobsCol()
-    .where("status", "==", "live")
-    .where("role", "in", wanted)
-    .get();
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Job, "id">) }));
+  const toJobs = (snap: FirebaseFirestore.QuerySnapshot) =>
+    snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Job, "id">) }));
+
+  return withIndexFallback(
+    "liveJobsForRoles",
+    async () =>
+      toJobs(
+        await jobsCol().where("status", "==", "live").where("role", "in", wanted).get(),
+      ),
+    // status + role needs a composite index; a single equality does not.
+    async () => {
+      const lower = new Set(wanted.map((r) => r.toLowerCase()));
+      return toJobs(await jobsCol().where("status", "==", "live").get()).filter((j) =>
+        lower.has(j.role.toLowerCase()),
+      );
+    },
+  );
 }
 
 /**
@@ -61,15 +75,9 @@ export async function resyncCandidateShortlists(
   const summary = toCandidateSummary(candidate);
 
   // Every existing row for this candidate, so we can spot the stale ones.
-  const existingSnap = await adminDb()
-    .collectionGroup(COLLECTIONS.shortlist)
-    .where("candidateId", "==", candidate.userId)
-    .get();
+  // Shared with the pipeline so both get the same index fallback.
   const existing = new Map(
-    existingSnap.docs.map((d) => [
-      (d.data() as JobCandidate).jobId,
-      d.data() as JobCandidate,
-    ]),
+    (await candidateEntries(candidate.userId)).map((e) => [e.jobId, e]),
   );
 
   let upserted = 0;

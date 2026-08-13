@@ -2,6 +2,7 @@ import "server-only";
 import { adminDb } from "../firebase/admin";
 import { COLLECTIONS } from "../collections";
 import { chunk } from "../chunk";
+import { withIndexFallback } from "../firestoreErrors";
 import { computeMatch } from "../matching";
 import { jobMatchesFilters, type JobFilters } from "../search";
 import { PAGE_SIZE, paginateArray, type Page } from "../pagination";
@@ -52,12 +53,27 @@ export async function listJobsByBusiness(businessId: string): Promise<Job[]> {
 export const MAX_RANKED_JOBS = 500;
 
 export async function listLiveJobs(limit = MAX_RANKED_JOBS): Promise<Job[]> {
-  const snap = await col()
-    .where("status", "==", "live")
-    .orderBy("createdAt", "desc")
-    .limit(limit)
-    .get();
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Job, "id">) }));
+  const toJobs = (snap: FirebaseFirestore.QuerySnapshot) =>
+    snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Job, "id">) }));
+
+  return withIndexFallback(
+    "listLiveJobs",
+    async () =>
+      toJobs(
+        await col()
+          .where("status", "==", "live")
+          .orderBy("createdAt", "desc")
+          .limit(limit)
+          .get(),
+      ),
+    // Ordering by createdAt alongside the status filter needs a composite
+    // index. Without it, fetch and sort in memory — the same shape this had
+    // before pagination, so it is known to work; just unbounded.
+    async () =>
+      toJobs(await col().where("status", "==", "live").get())
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, limit),
+  );
 }
 
 export async function createJob(input: NewJobInput): Promise<Job> {
