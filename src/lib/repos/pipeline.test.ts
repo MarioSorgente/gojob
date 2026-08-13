@@ -154,6 +154,26 @@ describe("ensureShortlistEntry", () => {
 });
 
 describe("candidateApply", () => {
+  it("creates one consistently linked match when apply and invite race", async () => {
+    await seed();
+    await ensureShortlistEntry(JOB_ID, CANDIDATE);
+
+    await Promise.all([
+      candidateApply(JOB_ID, CANDIDATE),
+      setEmployerAction(JOB_ID, CANDIDATE, "invited"),
+    ]);
+
+    const matches = db.dump("matches");
+    const conversations = db.dump("conversations");
+    const row = await entry();
+    expect(matches).toHaveLength(1);
+    expect(conversations).toHaveLength(1);
+    expect(row.stage).toBe("matched");
+    expect(row.matchId).toBe(matches[0].id);
+    expect(row.conversationId).toBe(conversations[0].id);
+    expect(conversations[0].data.matchId).toBe(matches[0].id);
+  });
+
   it("creates the row when the candidate was never shortlisted", async () => {
     // The regression: applying used to throw "Shortlist entry not found" for
     // anyone who registered after the job was posted — i.e. every visitor

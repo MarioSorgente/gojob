@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { adminDb } from "../firebase/admin";
 import { COLLECTIONS } from "../collections";
 import { withIndexFallback } from "../firestoreErrors";
@@ -170,58 +171,72 @@ export async function listCandidateMatches(
  */
 async function createMatch(
   job: Job,
-  entry: JobCandidate,
-): Promise<{ matchId: string; conversationId: string }> {
-  if (entry.matchId) {
-    return {
-      matchId: entry.matchId,
-      conversationId: entry.conversationId ?? entry.matchId,
+  candidateId: string,
+): Promise<{ matchId: string; conversationId: string } | null> {
+  // Length-prefixing makes the relationship unambiguous before hashing: pairs
+  // such as ("a:b", "c") and ("a", "b:c") cannot share the same input.
+  const relationship = `${job.id.length}:${job.id}${candidateId.length}:${candidateId}`;
+  const relationshipId = createHash("sha256").update(relationship).digest("hex");
+  const matchId = `match_${relationshipId}`;
+  const conversationId = `conversation_${relationshipId}`;
+  const db = adminDb();
+  const rowRef = shortlistDoc(job.id, candidateId);
+  const matchRef = db.collection(COLLECTIONS.matches).doc(matchId);
+  const convRef = db.collection(COLLECTIONS.conversations).doc(conversationId);
+
+  return db.runTransaction(async (transaction) => {
+    const rowSnap = await transaction.get(rowRef);
+    if (!rowSnap.exists) throw new Error("Shortlist entry not found");
+    const entry = rowSnap.data() as JobCandidate;
+
+    if (entry.matchId) {
+      return {
+        matchId: entry.matchId,
+        conversationId: entry.conversationId ?? entry.matchId,
+      };
+    }
+    if (
+      entry.candidateAction !== "applied" ||
+      entry.employerAction !== "invited"
+    ) {
+      return null;
+    }
+
+    const now = new Date().toISOString();
+    const participants = [job.ownerId, candidateId];
+    const candidateName =
+      `${entry.candidateSummary.firstName} ${entry.candidateSummary.lastName}`.trim();
+    const match: Omit<Match, "id"> = {
+      jobId: job.id,
+      businessId: job.businessId,
+      candidateId,
+      participants,
+      createdAt: now,
     };
-  }
+    const conversation: Omit<Conversation, "id"> = {
+      matchId,
+      jobId: job.id,
+      businessId: job.businessId,
+      candidateId,
+      participants,
+      jobRole: job.role,
+      businessName: job.businessName,
+      candidateName,
+      lastMessage: null,
+      lastMessageAt: null,
+      unread: { [job.ownerId]: 0, [candidateId]: 0 },
+      createdAt: now,
+    };
 
-  const now = new Date().toISOString();
-  const participants = [job.ownerId, entry.candidateId];
-  const candidateName =
-    `${entry.candidateSummary.firstName} ${entry.candidateSummary.lastName}`.trim();
-
-  const matchRef = adminDb().collection(COLLECTIONS.matches).doc();
-  const match: Omit<Match, "id"> = {
-    jobId: job.id,
-    businessId: job.businessId,
-    candidateId: entry.candidateId,
-    participants,
-    createdAt: now,
-  };
-  await matchRef.set(match);
-
-  const convRef = adminDb().collection(COLLECTIONS.conversations).doc();
-  const conversation: Omit<Conversation, "id"> = {
-    matchId: matchRef.id,
-    jobId: job.id,
-    businessId: job.businessId,
-    candidateId: entry.candidateId,
-    participants,
-    jobRole: job.role,
-    businessName: job.businessName,
-    candidateName,
-    lastMessage: null,
-    lastMessageAt: null,
-    unread: { [job.ownerId]: 0, [entry.candidateId]: 0 },
-    createdAt: now,
-  };
-  await convRef.set(conversation);
-
-  await shortlistDoc(job.id, entry.candidateId).set(
-    {
-      stage: "matched",
-      matchId: matchRef.id,
-      conversationId: convRef.id,
-      updatedAt: now,
-    },
-    { merge: true },
-  );
-
-  return { matchId: matchRef.id, conversationId: convRef.id };
+    transaction.set(matchRef, match);
+    transaction.set(convRef, conversation);
+    transaction.set(
+      rowRef,
+      { stage: "matched", matchId, conversationId, updatedAt: now },
+      { merge: true },
+    );
+    return { matchId, conversationId };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -339,18 +354,12 @@ export async function setEmployerAction(
     { merge: true },
   );
 
-  // Mutual interest already? (candidate applied earlier) -> match now.
-  if (entry.candidateAction === "applied") {
-    const job = await getJob(jobId);
-    if (!job) throw new Error("Job not found");
-    const { matchId, conversationId } = await createMatch(job, {
-      ...entry,
-      employerAction: "invited",
-    });
-    return { matched: true, matchId, conversationId };
-  }
-
-  return { matched: false };
+  // The transaction re-reads both actions; `entry` may already be stale when
+  // an application and invitation arrive concurrently.
+  const job = await getJob(jobId);
+  if (!job) throw new Error("Job not found");
+  const match = await createMatch(job, candidateId);
+  return match ? { matched: true, ...match } : { matched: false };
 }
 
 /** Candidate applies to a job (or accepts an invitation) — signals interest. */
@@ -374,17 +383,11 @@ export async function candidateApply(
     { merge: true },
   );
 
-  if (entry.employerAction === "invited") {
-    const job = await getJob(jobId);
-    if (!job) throw new Error("Job not found");
-    const { matchId, conversationId } = await createMatch(job, {
-      ...entry,
-      candidateAction: "applied",
-    });
-    return { matched: true, matchId, conversationId };
-  }
-
-  return { matched: false };
+  // Decide mutual interest from the transaction's fresh row, not `entry`.
+  const job = await getJob(jobId);
+  if (!job) throw new Error("Job not found");
+  const match = await createMatch(job, candidateId);
+  return match ? { matched: true, ...match } : { matched: false };
 }
 
 export async function candidatePass(
