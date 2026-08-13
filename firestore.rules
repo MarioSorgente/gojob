@@ -25,10 +25,12 @@ service cloud.firestore {
       allow read: if signedIn() && request.auth.uid == uid;
     }
 
-    // Realtime chat: only the two participants can read/update the conversation
-    // and read/create its messages. Everything is created server-side first.
+    // Realtime chat: participants can read conversations and messages. All
+    // conversation writes are server-side so clients cannot alter identity,
+    // authorization, or metadata fields (including participants and match/job
+    // ownership). Clients may only create a strictly shaped message.
     match /conversations/{cid} {
-      allow read, update: if isParticipant(resource.data.participants);
+      allow read: if isParticipant(resource.data.participants);
 
       match /messages/{mid} {
         allow read: if isParticipant(
@@ -37,7 +39,21 @@ service cloud.firestore {
         allow create: if isParticipant(
                         get(/databases/$(database)/documents/conversations/$(cid)).data.participants
                       )
-                      && request.resource.data.senderId == request.auth.uid;
+                      && request.resource.data.keys().hasAll([
+                        'conversationId', 'senderId', 'body', 'createdAt', 'readAt'
+                      ])
+                      && request.resource.data.keys().hasOnly([
+                        'conversationId', 'senderId', 'body', 'createdAt', 'readAt'
+                      ])
+                      && request.resource.data.conversationId is string
+                      && request.resource.data.conversationId == cid
+                      && request.resource.data.senderId is string
+                      && request.resource.data.senderId == request.auth.uid
+                      && request.resource.data.body is string
+                      && request.resource.data.body.size() > 0
+                      && request.resource.data.body.size() <= 4000
+                      && request.resource.data.createdAt is string
+                      && request.resource.data.readAt == null;
       }
     }
 
