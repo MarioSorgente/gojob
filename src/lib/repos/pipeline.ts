@@ -1,6 +1,7 @@
 import "server-only";
 import { adminDb } from "../firebase/admin";
 import { COLLECTIONS } from "../collections";
+import { withIndexFallback } from "../firestoreErrors";
 import { computeMatch } from "../matching";
 import { getJob } from "./jobs";
 import { getCandidate, toCandidateSummary } from "./candidates";
@@ -92,13 +93,40 @@ async function hydrateWithJobs(entries: JobCandidate[]): Promise<HydratedEntry[]
     .filter((x): x is HydratedEntry => x !== null);
 }
 
-/** All shortlist rows for one candidate across every job. */
-async function candidateEntries(candidateId: string): Promise<JobCandidate[]> {
-  const snap = await adminDb()
-    .collectionGroup(COLLECTIONS.shortlist)
-    .where("candidateId", "==", candidateId)
-    .get();
-  return snap.docs.map((d) => d.data() as JobCandidate);
+/**
+ * All shortlist rows for one candidate across every job.
+ *
+ * The collection-group filter needs a single-field COLLECTION_GROUP index,
+ * which Firestore does not create automatically — see the fieldOverrides entry
+ * in firestore.indexes.json. Until that exists and finishes building this falls
+ * back to reading the row directly out of each job, which needs no index at all
+ * because it addresses documents by path.
+ */
+export async function candidateEntries(candidateId: string): Promise<JobCandidate[]> {
+  return withIndexFallback(
+    "candidateEntries",
+    async () => {
+      const snap = await adminDb()
+        .collectionGroup(COLLECTIONS.shortlist)
+        .where("candidateId", "==", candidateId)
+        .get();
+      return snap.docs.map((d) => d.data() as JobCandidate);
+    },
+    async () => {
+      // One unfiltered read of jobs (no index needed), then a batched get of
+      // this candidate's row under each. Shortlist doc ids are the candidate id.
+      const jobsSnap = await jobsCol().select().get();
+      if (jobsSnap.empty) return [];
+
+      const refs = jobsSnap.docs.map((d) =>
+        d.ref.collection(COLLECTIONS.shortlist).doc(candidateId),
+      );
+      const docs = await adminDb().getAll(...refs);
+      return docs
+        .filter((d) => d.exists)
+        .map((d) => d.data() as JobCandidate);
+    },
+  );
 }
 
 /** Invitations awaiting the candidate's response. */

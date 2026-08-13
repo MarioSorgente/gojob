@@ -13,9 +13,18 @@ export default async function CandidateAppLayout({
   const user = await requireRole("candidate");
   if (!user.onboardingComplete) redirect("/candidate/onboarding");
 
+  // Badge counts must never take the shell down with them: a failure here used
+  // to throw from the layout, which 500'd every page underneath it. A missing
+  // badge is a far better outcome than an unusable app.
   const [invites, unread] = await Promise.all([
-    listCandidateInvitations(user.uid),
-    countUnreadForUser(user.uid),
+    listCandidateInvitations(user.uid).catch((error) => {
+      console.error("Invitation badge failed", error);
+      return [];
+    }),
+    countUnreadForUser(user.uid).catch((error) => {
+      console.error("Unread badge failed", error);
+      return 0;
+    }),
   ]);
 
   const items = [

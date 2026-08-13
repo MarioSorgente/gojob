@@ -50,5 +50,17 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "_comment": "Firestore auto-indexes single fields only at COLLECTION scope. The collection-group queries in repos/pipeline.ts and repos/rematch.ts filter shortlist rows by candidateId across every job, which needs this explicitly or they fail with FAILED_PRECONDITION.",
+      "collectionGroup": "shortlist",
+      "fieldPath": "candidateId",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION" },
+        { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    }
+  ]
 }

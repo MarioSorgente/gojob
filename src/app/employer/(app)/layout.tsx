@@ -17,8 +17,13 @@ export default async function EmployerAppLayout({
 
   // These two feed nav badges only, so they run in parallel and count rather
   // than reading whole documents — this layout renders on every employer page.
+  // See the note in the candidate layout: a badge query must not be able to
+  // bring down the shell.
   const [unread, saved] = await Promise.all([
-    countUnreadForUser(user.uid),
+    countUnreadForUser(user.uid).catch((error) => {
+      console.error("Unread badge failed", error);
+      return 0;
+    }),
     countSavedForBusiness(business.id),
   ]);
 

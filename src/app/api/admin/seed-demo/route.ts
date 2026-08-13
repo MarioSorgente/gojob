@@ -20,7 +20,8 @@ export const maxDuration = 60;
 
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { adminAuth, adminDb, getAdminApp } from "@/lib/firebase/admin";
+import { ensureIndexes } from "@/lib/demo/indexes";
 import { credentialSource, isEmulator, projectIdFromEnv } from "@/lib/firebase/credentials";
 import { getSessionUser } from "@/lib/auth";
 import { grantRole, runReset, runSeed, runStatus, type DemoCtx } from "@/lib/demo/seed";
@@ -87,6 +88,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true, action, ...result });
       }
 
+      case "create-indexes": {
+        // Declaring indexes in firestore.indexes.json does nothing until they
+        // are deployed, which normally needs the Firebase CLI. This does it
+        // over the Admin REST API with the credentials already configured.
+        const result = await ensureIndexes(getAdminApp(), projectId);
+        return NextResponse.json({ ok: true, action, ...result });
+      }
+
       case "reset": {
         if (body.confirm !== RESET_CONFIRMATION) {
           return NextResponse.json(
@@ -115,7 +124,10 @@ export async function POST(request: Request) {
 
       default:
         return NextResponse.json(
-          { error: "action must be one of: status, seed, reset, grant-role" },
+          {
+            error:
+              "action must be one of: status, create-indexes, seed, reset, grant-role",
+          },
           { status: 400 },
         );
     }

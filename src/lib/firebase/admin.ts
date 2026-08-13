@@ -19,7 +19,9 @@ import { adminAppOptions } from "./credentials";
 
 let cachedApp: App | undefined;
 
-function getAdminApp(): App {
+/** Exported so callers needing the raw credential (e.g. the Admin REST API for
+ *  index management) don't have to initialize a second app. */
+export function getAdminApp(): App {
   if (cachedApp) return cachedApp;
   cachedApp = getApps().length ? getApps()[0] : initializeApp(adminAppOptions());
   return cachedApp;

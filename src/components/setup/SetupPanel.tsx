@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button, Card, Field, Input, Select } from "@/components/ui";
 
-type Action = "status" | "seed" | "reset" | "grant-role";
+type Action = "status" | "create-indexes" | "seed" | "reset" | "grant-role";
 
 const RESET_CONFIRMATION = "DELETE-DEMO-DATA";
 
@@ -78,6 +78,13 @@ export function SetupPanel() {
           <Button variant="outline" disabled={disabled} onClick={() => void run("status")}>
             {busy === "status" ? "Checking…" : "Check status"}
           </Button>
+          <Button
+            variant="outline"
+            disabled={disabled}
+            onClick={() => void run("create-indexes")}
+          >
+            {busy === "create-indexes" ? "Creating…" : "Create indexes"}
+          </Button>
           <Button disabled={disabled} onClick={() => void run("seed")}>
             {busy === "seed" ? "Seeding…" : "Seed demo data"}
           </Button>
@@ -87,7 +94,9 @@ export function SetupPanel() {
         </div>
         <p className="mt-3 text-xs text-muted">
           Check status first — it reports which Firebase project this deployment is
-          actually writing to. Seeding is idempotent, so it is safe to re-run.
+          actually writing to. Then create indexes: several queries need them and
+          fail until they exist. Indexes build in the background and can take a
+          few minutes. Seeding is idempotent, so it is safe to re-run.
         </p>
       </Card>
 
