@@ -20,9 +20,9 @@ export function BottomNav({ items }: { items: NavItem[] }) {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-20 min-h-[var(--mobile-nav-height)] border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-20 min-h-[var(--bottom-nav-clearance)] border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur md:hidden"
     >
-      <div className="mx-auto flex max-w-md items-stretch">
+      <div className="mx-auto flex h-[var(--bottom-nav-base-height)] max-w-md items-stretch">
         {items.map((item) => {
           const isActive = item.href === active;
           return (
