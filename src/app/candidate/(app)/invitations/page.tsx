@@ -1,50 +1,66 @@
+import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth";
 import { listCandidateInvitations } from "@/lib/repos/pipeline";
-import { formatSalaryRange } from "@/lib/cn";
-import { Card, EmptyState, PageTitle } from "@/components/ui";
+import { getI18n } from "@/lib/i18n/server";
+import { roleLabel } from "@/lib/i18n/taxonomy";
+import { ButtonLink, Card, EmptyState, PageTitle } from "@/components/ui";
 import { ReasonList } from "@/components/cards/match";
+import { JobMeta } from "@/components/cards/JobMeta";
 import { InvitationActions } from "@/components/candidate/InvitationActions";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("candidate.invitationsTitle") };
+}
 
 export default async function InvitationsPage() {
   const user = await requireRole("candidate");
-  const invites = await listCandidateInvitations(user.uid);
+  const [invites, { locale, t }] = await Promise.all([
+    listCandidateInvitations(user.uid),
+    getI18n(),
+  ]);
 
   return (
     <>
       <PageTitle
-        title="Invitations"
-        subtitle="Businesses that want to speak with you"
+        title={t("candidate.invitationsTitle")}
+        subtitle={t("candidate.invitationsSubtitle")}
       />
       {invites.length === 0 ? (
         <EmptyState
-          icon="✨"
-          title="No invitations yet"
-          hint="Keep your profile strong — employers can invite you directly."
+          icon="sparkle"
+          title={t("candidate.noInvitations")}
+          hint={t("candidate.noInvitationsHint")}
+          action={
+            <ButtonLink href="/candidate/profile" variant="outline">
+              {t("candidate.editProfile")}
+            </ButtonLink>
+          }
         />
       ) : (
-        <div className="space-y-3">
+        <ul className="space-y-3">
           {invites.map(({ entry, job }) => (
-            <Card key={job.id} className="p-4">
-              <p className="text-sm text-muted">
-                <span className="font-semibold text-foreground">
-                  {job.businessName}
-                </span>{" "}
-                would like to speak with you about
-              </p>
-              <h3 className="mt-0.5 text-lg font-bold">{job.role}</h3>
-              <p className="mt-1 text-sm text-muted">
-                📍 {job.area} · 💰{" "}
-                {formatSalaryRange(job.salaryType, job.salaryMin, job.salaryMax) || "—"}
-              </p>
-              {entry.reasons.length > 0 && (
-                <div className="mt-3">
-                  <ReasonList reasons={entry.reasons} limit={3} />
-                </div>
-              )}
-              <InvitationActions jobId={job.id} businessName={job.businessName} />
-            </Card>
+            <li key={job.id}>
+              <Card className="p-4">
+                <p className="text-sm text-muted">
+                  <span className="font-semibold text-foreground">
+                    {job.businessName}
+                  </span>
+                </p>
+                <h2 className="mt-0.5 text-lg font-bold leading-tight">
+                  {roleLabel(job.role, locale)}
+                </h2>
+                <JobMeta job={job} locale={locale} t={t} showEmploymentType className="mt-2" />
+                {entry.reasons.length > 0 && (
+                  <div className="mt-3">
+                    <ReasonList reasons={entry.reasons} limit={3} />
+                  </div>
+                )}
+                <InvitationActions jobId={job.id} businessName={job.businessName} />
+              </Card>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </>
   );

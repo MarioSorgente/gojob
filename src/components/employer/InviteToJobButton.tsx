@@ -3,7 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { inviteFromSearchAction } from "@/app/employer/actions";
-import { Button, Select } from "@/components/ui";
+import { Button, Select, Spinner } from "@/components/ui";
+import { Icon } from "@/components/Icon";
+import { useT } from "@/lib/i18n/client";
 import { MatchCelebration } from "@/components/MatchCelebration";
 import { useToast } from "@/components/Toast";
 
@@ -23,6 +25,7 @@ export function InviteToJobButton({
   size?: "sm" | "md" | "lg";
 }) {
   const router = useRouter();
+  const t = useT();
   const { show } = useToast();
   const [picking, setPicking] = useState(false);
   const [jobId, setJobId] = useState(jobs[0]?.id ?? "");
@@ -38,7 +41,7 @@ export function InviteToJobButton({
       if (res.matched && res.conversationId) {
         setMatchHref(`/employer/chat/${res.conversationId}`);
       } else {
-        show(`Invitation sent to ${name}`);
+        show(`${t("employer.invited")} — ${name}`);
         router.refresh();
       }
     });
@@ -46,14 +49,19 @@ export function InviteToJobButton({
 
   if (jobs.length === 0) {
     return (
-      <Button size={size} variant="subtle" disabled title="Post a job first">
-        Invite
+      <Button size={size} variant="subtle" disabled title={t("employer.noJobsHint")}>
+        {t("employer.invite")}
       </Button>
     );
   }
 
   if (invited && !matchHref) {
-    return <span className="text-sm font-semibold text-success">✓ Invited</span>;
+    return (
+      <span className="inline-flex items-center gap-1 text-sm font-semibold text-success">
+        <Icon name="check" className="h-4 w-4" />
+        {t("employer.invited")}
+      </span>
+    );
   }
 
   return (
@@ -72,7 +80,8 @@ export function InviteToJobButton({
             ))}
           </Select>
           <Button size="sm" onClick={() => invite(jobId)} disabled={pending}>
-            {pending ? "…" : "Send"}
+            {pending ? <Spinner /> : null}
+            {t("chat.send")}
           </Button>
         </div>
       ) : (
@@ -81,14 +90,15 @@ export function InviteToJobButton({
           disabled={pending}
           onClick={() => (jobs.length === 1 ? invite(jobs[0].id) : setPicking(true))}
         >
-          {pending ? "…" : "Invite"}
+          {pending ? <Spinner /> : null}
+          {t("employer.invite")}
         </Button>
       )}
 
       <MatchCelebration
         open={!!matchHref}
         chatHref={matchHref ?? "#"}
-        subtitle={`You and ${name} are connected.`}
+        subtitle={name}
         onClose={() => {
           setMatchHref(null);
           router.refresh();

@@ -31,9 +31,9 @@ export function ShortlistProgress({ failed = false }: { failed?: boolean }) {
 
   if (failed) {
     return (
-      <Card className="border-red-200 bg-red-50 p-4">
-        <p className="font-semibold text-red-900">Couldn&apos;t build the shortlist</p>
-        <p className="mt-0.5 text-sm text-red-800">
+      <Card className="border-danger/25 bg-danger-soft p-4">
+        <p className="font-semibold text-danger">Couldn&apos;t build the shortlist</p>
+        <p className="mt-0.5 text-sm text-danger">
           Your job is still live and candidates can apply. Try editing and
           re-saving the job, or contact support if it keeps happening.
         </p>

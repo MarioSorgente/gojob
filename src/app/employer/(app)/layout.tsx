@@ -5,6 +5,8 @@ import { getBusinessByOwner } from "@/lib/repos/businesses";
 import { countUnreadForUser } from "@/lib/repos/chat";
 import { countSavedForBusiness } from "@/lib/repos/shortlist";
 import { AppShell } from "@/components/AppShell";
+import type { NavItem } from "@/components/navigation";
+import { getT } from "@/lib/i18n/server";
 
 export default async function EmployerAppLayout({
   children,
@@ -27,17 +29,24 @@ export default async function EmployerAppLayout({
     countSavedForBusiness(business.id),
   ]);
 
-  const items = [
-    { href: "/employer", label: "Jobs", icon: "🧭" },
-    { href: "/employer/candidates", label: "Find", icon: "🔍" },
+  const t = await getT();
+
+  const items: NavItem[] = [
+    { href: "/employer", label: t("nav.jobs"), icon: "briefcase" },
+    { href: "/employer/candidates", label: t("nav.find"), icon: "search" },
     {
       href: "/employer/shortlist",
-      label: "Shortlist",
-      icon: "⭐",
+      label: t("nav.shortlist"),
+      icon: "star",
       badge: saved || undefined,
     },
-    { href: "/employer/matches", label: "Chats", icon: "💬", badge: unread || undefined },
-    { href: "/employer/business", label: "Venue", icon: "🏝️" },
+    {
+      href: "/employer/matches",
+      label: t("nav.chats"),
+      icon: "chat",
+      badge: unread || undefined,
+    },
+    { href: "/employer/business", label: t("nav.venue"), icon: "building" },
   ];
 
   return <AppShell items={items}>{children}</AppShell>;

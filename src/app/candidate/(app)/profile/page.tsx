@@ -1,111 +1,119 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth";
 import { getCandidate } from "@/lib/repos/candidates";
 import { computeProfileStrength } from "@/lib/profileStrength";
 import { totalExperienceYears } from "@/lib/dates";
-import { formatSalaryRange } from "@/lib/cn";
-import { Avatar, Badge, ButtonLink, Card } from "@/components/ui";
+import { formatMonthYear, formatSalary } from "@/lib/format";
+import { getI18n } from "@/lib/i18n/server";
+import {
+  areaLabel,
+  availabilityLabel,
+  employmentTypeLabel,
+  languageLabel,
+  proficiencyLabel,
+  roleLabel,
+} from "@/lib/i18n/taxonomy";
+import { Avatar, Badge, ButtonLink, Card, Section } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 import { ProfileStrengthCard } from "@/components/candidate/ProfileStrengthCard";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("candidate.profileTitle") };
+}
 
 export default async function CandidateProfilePage() {
   const user = await requireRole("candidate");
   const c = await getCandidate(user.uid);
   if (!c) redirect("/candidate/onboarding");
 
+  const { locale, t } = await getI18n();
   const strength = computeProfileStrength(c);
   const name = `${c.firstName} ${c.lastName}`.trim();
   const years = totalExperienceYears(c.experiences);
 
   return (
-    <main className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(16rem,2fr)_minmax(0,3fr)] lg:items-start">
-      <aside
-        className="contents space-y-4 lg:block"
-        aria-label="Profile summary"
-      >
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(16rem,2fr)_minmax(0,3fr)] lg:items-start">
+      <aside className="contents space-y-4 lg:block" aria-label={t("candidate.profileTitle")}>
         <Card className="min-w-0 overflow-hidden p-5">
-          <section aria-labelledby="profile-identity-heading">
-            <div className="flex min-w-0 items-start gap-4">
-              <div className="shrink-0">
-                <Avatar name={name} photo={c.photo} size={64} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h1
-                  id="profile-identity-heading"
-                  className="break-words text-xl font-bold [overflow-wrap:anywhere]"
-                >
-                  {name}
-                </h1>
-                <p className="break-words text-muted [overflow-wrap:anywhere]">
-                  {c.roles[0] ?? "Hospitality"}
-                </p>
-                <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-sm text-muted">
-                  <span className="break-words [overflow-wrap:anywhere]">
-                    📍 {c.area}
-                  </span>
-                  <span className="break-words [overflow-wrap:anywhere]">
-                    🟢 {c.availability.type.replace("Available ", "")}
-                  </span>
-                </div>
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="shrink-0">
+              <Avatar name={name} photo={c.photo} size={64} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="type-title break-words [overflow-wrap:anywhere]">
+                {name}
+              </h1>
+              <p className="break-words text-muted [overflow-wrap:anywhere]">
+                {c.roles[0] ? roleLabel(c.roles[0], locale) : ""}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted">
+                <span className="inline-flex items-center gap-1">
+                  <Icon name="mapPin" className="h-4 w-4" />
+                  {areaLabel(c.area, locale)}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Icon name="clock" className="h-4 w-4" />
+                  {availabilityLabel(c.availability.type, locale)}
+                </span>
               </div>
             </div>
-          </section>
+          </div>
 
-          <section className="mt-3" aria-label="Verification status">
-            <div className="flex flex-wrap gap-2">
-              {c.verification.phone === "verified" && (
-                <Badge tone="green">✓ Phone</Badge>
-              )}
-              {c.verification.id === "verified" && (
-                <Badge tone="green">✓ ID</Badge>
-              )}
-              {c.verification.employment === "verified" && (
-                <Badge tone="green">✓ Employment</Badge>
-              )}
-            </div>
-          </section>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {c.verification.phone === "verified" && (
+              <Badge tone="green">
+                <Icon name="checkBadge" className="h-3.5 w-3.5" />
+                {t("auth.phone")}
+              </Badge>
+            )}
+            {c.verification.id === "verified" && (
+              <Badge tone="green">
+                <Icon name="checkBadge" className="h-3.5 w-3.5" />
+                ID
+              </Badge>
+            )}
+            {c.verification.employment === "verified" && (
+              <Badge tone="green">
+                <Icon name="checkBadge" className="h-3.5 w-3.5" />
+                {t("candidate.experience")}
+              </Badge>
+            )}
+          </div>
         </Card>
 
-        <section className="mt-4" aria-label="Profile strength">
-          <ProfileStrengthCard strength={strength} />
-        </section>
+        <div className="mt-4 lg:mt-4">
+          <ProfileStrengthCard strength={strength} t={t} />
+        </div>
 
         <Card className="mt-4 p-5">
-          <section aria-labelledby="preferences-heading">
-            <h2
-              id="preferences-heading"
-              className="mb-2 text-sm font-bold uppercase tracking-wide text-muted"
-            >
-              Looking for
-            </h2>
+          <Section title={t("candidate.desiredRoles")}>
             <div className="flex flex-wrap gap-2">
               {c.roles.map((r) => (
                 <Badge key={r} tone="brand">
-                  {r}
+                  {roleLabel(r, locale)}
                 </Badge>
               ))}
             </div>
-            <p className="mt-3 break-words text-sm [overflow-wrap:anywhere]">
-              💰{" "}
-              {formatSalaryRange(c.salary.type, c.salary.min, c.salary.max) ||
-                "Not set"}
+            <p className="mt-3 inline-flex items-center gap-1.5 break-words text-sm [overflow-wrap:anywhere]">
+              <Icon name="wallet" className="h-4 w-4 text-muted" />
+              {formatSalary(c.salary.type, c.salary.min, c.salary.max, locale) ||
+                t("common.notSet")}
             </p>
             {c.employmentTypes.length > 0 && (
               <p className="mt-1 break-words text-sm text-muted [overflow-wrap:anywhere]">
-                {c.employmentTypes.join(" · ")}
+                {c.employmentTypes
+                  .map((e) => employmentTypeLabel(e, locale))
+                  .join(" · ")}
               </p>
             )}
-          </section>
+          </Section>
         </Card>
 
         {c.skills.length > 0 && (
           <Card className="mt-4 p-5">
-            <section aria-labelledby="skills-heading">
-              <h2
-                id="skills-heading"
-                className="mb-2 text-sm font-bold uppercase tracking-wide text-muted"
-              >
-                Skills
-              </h2>
+            <Section title={t("candidate.skills")}>
               <div className="flex flex-wrap gap-2">
                 {c.skills.map((s) => (
                   <Badge key={s.name} tone="slate">
@@ -113,85 +121,76 @@ export default async function CandidateProfilePage() {
                   </Badge>
                 ))}
               </div>
-            </section>
+            </Section>
           </Card>
         )}
 
         {c.languages.length > 0 && (
           <Card className="mt-4 p-5">
-            <section aria-labelledby="languages-heading">
-              <h2
-                id="languages-heading"
-                className="mb-2 text-sm font-bold uppercase tracking-wide text-muted"
-              >
-                Languages
-              </h2>
+            <Section title={t("job.languages")}>
               <ul className="space-y-1 text-sm">
                 {c.languages.map((l) => (
-                  <li
-                    key={l.language}
-                    className="flex flex-wrap justify-between gap-x-3"
-                  >
+                  <li key={l.language} className="flex flex-wrap justify-between gap-x-3">
                     <span className="break-words [overflow-wrap:anywhere]">
-                      {l.language}
+                      {languageLabel(l.language, locale)}
                     </span>
-                    <span className="text-muted">{l.level}</span>
+                    <span className="text-muted">
+                      {proficiencyLabel(l.level, locale)}
+                    </span>
                   </li>
                 ))}
               </ul>
-            </section>
+            </Section>
           </Card>
         )}
 
-        <nav
-          className="order-2 mt-4 flex flex-wrap gap-3"
-          aria-label="Profile actions"
-        >
+        <nav className="order-2 mt-4 flex flex-wrap gap-3" aria-label={t("common.edit")}>
           <ButtonLink
             href="/candidate/edit"
             variant="outline"
             className="min-w-0 flex-[1_1_10rem]"
           >
-            Edit profile
+            {t("candidate.editProfile")}
           </ButtonLink>
           <ButtonLink
             href="/candidate/verification"
             variant="outline"
             className="min-w-0 flex-[1_1_10rem]"
           >
-            Verification
+            {t("candidate.verification")}
+          </ButtonLink>
+          {/* The applications list had no entry point anywhere in the app. */}
+          <ButtonLink
+            href="/candidate/applications"
+            variant="outline"
+            className="min-w-0 flex-[1_1_10rem]"
+          >
+            {t("nav.applications")}
           </ButtonLink>
         </nav>
       </aside>
 
       <div className="order-1 min-w-0 lg:order-none">
         <Card className="p-5">
-          <section aria-labelledby="experience-heading">
-            <h2
-              id="experience-heading"
-              className="mb-2 text-sm font-bold uppercase tracking-wide text-muted"
-            >
-              Experience · {years} yr{years === 1 ? "" : "s"}
-            </h2>
+          <Section title={`${t("candidate.experience")} · ${years}`}>
             {c.experiences.length === 0 ? (
-              <p className="text-sm text-muted">No experience added yet.</p>
+              <p className="text-sm text-muted">{t("common.notSet")}</p>
             ) : (
               <ul className="space-y-3">
                 {c.experiences.map((e) => (
-                  <li
-                    key={e.id}
-                    className="min-w-0 border-l-2 border-brand-soft pl-3"
-                  >
+                  <li key={e.id} className="min-w-0 border-l-2 border-brand-soft pl-3">
                     <p className="break-words font-semibold [overflow-wrap:anywhere]">
                       {e.role}
                     </p>
                     <p className="break-words text-sm text-muted [overflow-wrap:anywhere]">
-                      {e.companyName} · {e.startDate?.slice(0, 7)}
+                      {e.companyName} · {formatMonthYear(e.startDate, locale)}
                       {" – "}
-                      {e.current ? "Present" : (e.endDate?.slice(0, 7) ?? "")}
+                      {e.current
+                        ? t("candidate.present")
+                        : formatMonthYear(e.endDate, locale)}
                     </p>
                     {e.description && (
-                      <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-slate-600 [overflow-wrap:anywhere]">
+                      <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-subtle [overflow-wrap:anywhere]">
                         {e.description}
                       </p>
                     )}
@@ -199,9 +198,9 @@ export default async function CandidateProfilePage() {
                 ))}
               </ul>
             )}
-          </section>
+          </Section>
         </Card>
       </div>
-    </main>
+    </div>
   );
 }

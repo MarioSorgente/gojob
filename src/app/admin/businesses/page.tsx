@@ -18,7 +18,7 @@ export default async function AdminBusinessesPage() {
       <p className="mb-5 text-sm text-muted">{businesses.length} total</p>
 
       {businesses.length === 0 ? (
-        <EmptyState icon="🏝️" title="No businesses yet" />
+        <EmptyState icon="building" title="No businesses yet" />
       ) : (
         <div className="space-y-2">
           {businesses.map((b) => (

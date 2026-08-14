@@ -22,8 +22,8 @@ queue, and the monetization UI are in place.
 | Check | Status |
 | --- | --- |
 | `npm run typecheck` | ✅ clean |
-| `npm run test` | ✅ 21/21 passing (3 files) |
-| `npm run build` | ✅ 34 routes |
+| `npm run test` | ✅ 197/197 passing (24 files) |
+| `npm run build` | ✅ 41 routes |
 | Deployed on Vercel | ✅ (needs env vars — see [README](../README.md)) |
 
 **Not production-ready yet.** The gaps that matter are listed in

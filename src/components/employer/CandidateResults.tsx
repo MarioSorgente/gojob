@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback } from "react";
 import Link from "next/link";
 import { loadCandidatesPageAction } from "@/app/search-actions";
 import { LoadMoreButton } from "@/components/LoadMoreButton";
-import { EmptyState } from "@/components/ui";
+import { useCursorList } from "@/components/useCursorList";
+import { ButtonLink, EmptyState } from "@/components/ui";
+import { useI18n } from "@/lib/i18n/client";
 import { ApplicantRow } from "./ApplicantRow";
 import { InviteToJobButton } from "./InviteToJobButton";
 import type { CandidateFilters } from "@/lib/search";
@@ -26,53 +28,50 @@ export function CandidateResults({
   filters: CandidateFilters;
   jobs: { id: string; role: string }[];
 }) {
-  const [items, setItems] = useState(initialItems);
-  const [cursor, setCursor] = useState(initialCursor);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { locale, t } = useI18n();
 
-  async function loadMore() {
-    setLoading(true);
-    setError(null);
-    try {
-      const page = await loadCandidatesPageAction(filters, cursor);
-      // De-duplicate defensively: a profile edited mid-scroll can shift
-      // position and reappear in a later page.
-      setItems((prev) => {
-        const seen = new Set(prev.map((c) => c.userId));
-        return [...prev, ...page.items.filter((c) => !seen.has(c.userId))];
-      });
-      setCursor(page.nextCursor);
-    } catch {
-      setError("Couldn't load more candidates.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const fetchPage = useCallback(
+    (cursor: string | null) => loadCandidatesPageAction(filters, cursor),
+    [filters],
+  );
+
+  const { items, hasMore, loading, failed, loadMore } = useCursorList<CandidateResult>({
+    initialItems,
+    initialCursor,
+    getId: (c) => c.userId,
+    fetchPage,
+  });
 
   if (items.length === 0) {
     return (
       <EmptyState
-        icon="🔍"
-        title="No candidates match those filters"
-        hint="Try widening the area or lowering the experience requirement."
+        icon="search"
+        title={t("employer.noCandidates")}
+        hint={t("employer.noCandidatesHint")}
+        action={
+          <ButtonLink href="/employer/candidates" variant="outline">
+            {t("common.clearAll")}
+          </ButtonLink>
+        }
       />
     );
   }
 
   return (
     <>
-      <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
+      <ul className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
         {items.map((c) => (
           // Stretched link rather than wrapping the row: a <button> inside an
           // <a> is invalid, and the previous `<div onClick={preventDefault}>`
           // only suppressed mouse clicks — keyboard activation of Invite still
           // navigated away.
-          <div key={c.userId} className="relative">
+          <li key={c.userId} className="relative">
             <ApplicantRow
               summary={c.summary}
               score={c.profileStrength}
               scoreLabel="profile"
+              locale={locale}
+              t={t}
               right={
                 <div className="relative z-10">
                   <InviteToJobButton
@@ -85,18 +84,18 @@ export function CandidateResults({
             />
             <Link
               href={`/employer/candidates/${c.userId}`}
-              className="absolute inset-0 z-0 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="absolute inset-0 z-0 rounded-card outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             >
-              <span className="sr-only">View {c.firstName}&apos;s profile</span>
+              <span className="sr-only">{c.firstName}</span>
             </Link>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
       <LoadMoreButton
-        hasMore={cursor !== null}
+        hasMore={hasMore}
         loading={loading}
-        error={error}
-        onClick={() => void loadMore()}
+        failed={failed}
+        onClick={loadMore}
       />
     </>
   );

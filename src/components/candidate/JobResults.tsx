@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback } from "react";
 import { loadJobsPageAction } from "@/app/search-actions";
 import { LoadMoreButton } from "@/components/LoadMoreButton";
 import { JobCard } from "@/components/cards/JobCard";
+import { useCursorList } from "@/components/useCursorList";
 import { EmptyState } from "@/components/ui";
+import { useI18n } from "@/lib/i18n/client";
 import type { JobFilters } from "@/lib/search";
 import type { JobResult } from "@/lib/searchResults";
+import type { CandidateAction } from "@/lib/types";
+import type { ReactNode } from "react";
 
 /**
  * Ranked job list with "Load more". The first page arrives server-rendered;
@@ -16,80 +20,85 @@ export function JobResults({
   initialItems,
   initialCursor,
   filters,
-  label = "Jobs",
+  label,
   emptyTitle,
   emptyHint,
+  emptyAction,
+  actions,
 }: {
   initialItems: JobResult[];
   initialCursor: string | null;
   filters: JobFilters;
-  label?: string;
+  label: string;
   emptyTitle: string;
   emptyHint: string;
+  /** A way out of the empty state. An empty list with no next step is a dead end. */
+  emptyAction?: ReactNode;
+  /** jobId → what this candidate already did, so the feed can mark dead ends. */
+  actions?: Record<string, CandidateAction>;
 }) {
-  const [items, setItems] = useState(initialItems);
-  const [cursor, setCursor] = useState(initialCursor);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { locale, t } = useI18n();
 
-  async function loadMore() {
-    setLoading(true);
-    setError(null);
-    try {
-      const page = await loadJobsPageAction(filters, cursor);
-      setItems((prev) => {
-        const seen = new Set(prev.map((r) => r.job.id));
-        return [...prev, ...page.items.filter((r) => !seen.has(r.job.id))];
-      });
-      setCursor(page.nextCursor);
-    } catch {
-      setError("Couldn't load more jobs.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const fetchPage = useCallback(
+    (cursor: string | null) => loadJobsPageAction(filters, cursor),
+    [filters],
+  );
+
+  const { items, hasMore, loading, failed, loadMore } = useCursorList<JobResult>({
+    initialItems,
+    initialCursor,
+    getId: (r) => r.job.id,
+    fetchPage,
+  });
 
   return (
     <section aria-labelledby="job-results-heading">
       <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 id="job-results-heading" className="font-bold text-slate-800">
+        <h2 id="job-results-heading" className="type-heading">
           {label}
         </h2>
         <p className="shrink-0 text-sm text-muted" aria-live="polite">
-          {items.length} {items.length === 1 ? "job" : "jobs"}
+          {items.length === 1
+            ? t("filter.resultsCountOne")
+            : hasMore
+              ? t("filter.resultsCountCapped", { count: items.length })
+              : t("filter.resultsCount", { count: items.length })}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
-        {items.length === 0 ? (
-          <div className="col-span-full">
-            <EmptyState icon="🔎" title={emptyTitle} hint={emptyHint} />
-          </div>
-        ) : (
-          items.map((r) => (
-            <div key={r.job.id} className="h-full min-w-0">
-              <JobCard
-                job={r.job}
-                score={r.score}
-                reasons={r.reasons}
-                breakdown={r.breakdown}
-                href={`/candidate/jobs/${r.job.id}`}
-              />
-            </div>
-          ))
-        )}
-
-        {items.length > 0 && (
-          <div className="col-span-full">
-            <LoadMoreButton
-              hasMore={cursor !== null}
-              loading={loading}
-              error={error}
-              onClick={() => void loadMore()}
-            />
-          </div>
-        )}
-      </div>
+      {items.length === 0 ? (
+        <EmptyState
+          icon="search"
+          title={emptyTitle}
+          hint={emptyHint}
+          action={emptyAction}
+        />
+      ) : (
+        <>
+          <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
+            {items.map((r) => (
+              <li key={r.job.id} className="h-full min-w-0">
+                <JobCard
+                  job={r.job}
+                  score={r.score}
+                  reasons={r.reasons}
+                  breakdown={r.breakdown}
+                  href={`/candidate/jobs/${r.job.id}`}
+                  action={actions?.[r.job.id]}
+                  locale={locale}
+                  t={t}
+                />
+              </li>
+            ))}
+          </ul>
+          <LoadMoreButton
+            hasMore={hasMore}
+            loading={loading}
+            failed={failed}
+            onClick={loadMore}
+          />
+        </>
+      )}
     </section>
   );
 }

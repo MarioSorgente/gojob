@@ -4,12 +4,14 @@ import { requireRole } from "@/lib/auth";
 import { getBusinessByOwner } from "@/lib/repos/businesses";
 import { listSavedForBusiness } from "@/lib/repos/shortlist";
 import { ButtonLink, EmptyState, PageTitle, Section } from "@/components/ui";
+import { getI18n } from "@/lib/i18n/server";
+import { roleLabel } from "@/lib/i18n/taxonomy";
 import { ApplicantRow } from "@/components/employer/ApplicantRow";
 import { InviteButton } from "@/components/employer/InviteButton";
 import { UnsaveButton } from "@/components/employer/UnsaveButton";
 import { MatchExplain } from "@/components/cards/MatchExplain";
 
-export const metadata = { title: "Shortlist — GoJob" };
+export const metadata = { title: "Shortlist" };
 
 /**
  * Saved candidates across every job.
@@ -23,6 +25,7 @@ export default async function ShortlistPage() {
   const business = await getBusinessByOwner(user.uid);
   if (!business) redirect("/employer/onboarding");
 
+  const { locale, t } = await getI18n();
   const saved = await listSavedForBusiness(business.id);
 
   // Group by job so a row always says which position it was saved for.
@@ -36,33 +39,29 @@ export default async function ShortlistPage() {
   return (
     <>
       <PageTitle
-        title="Shortlist"
-        subtitle={
-          saved.length > 0
-            ? `${saved.length} candidate${saved.length === 1 ? "" : "s"} saved for later`
-            : "Candidates you save are kept here"
-        }
+        title={t("employer.savedTitle")}
+        subtitle={t("employer.savedSubtitle")}
       />
 
       {saved.length === 0 ? (
         <EmptyState
-          icon="⭐"
-          title="Nothing saved yet"
-          hint="Tap Save on a candidate while reviewing a job and they'll wait for you here."
-          action={<ButtonLink href="/employer">Review candidates</ButtonLink>}
+          icon="star"
+          title={t("employer.noSaved")}
+          hint={t("employer.noSavedHint")}
+          action={<ButtonLink href="/employer">{t("nav.jobs")}</ButtonLink>}
         />
       ) : (
         <div className="space-y-6">
           {[...byJob.entries()].map(([jobId, { role, rows }]) => (
             <Section
               key={jobId}
-              title={`${role} · ${rows.length}`}
+              title={`${roleLabel(role, locale)} · ${rows.length}`}
               action={
                 <Link
                   href={`/employer/jobs/${jobId}`}
                   className="rounded text-sm font-semibold text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand/40"
                 >
-                  Open job
+                  {t("common.seeAll")}
                 </Link>
               }
             >
@@ -71,6 +70,8 @@ export default async function ShortlistPage() {
                   <ApplicantRow
                     key={`${jobId}-${entry.candidateId}`}
                     summary={entry.candidateSummary}
+                    locale={locale}
+                    t={t}
                     scoreSlot={
                       <MatchExplain
                         score={entry.score}

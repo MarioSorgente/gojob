@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
-import { Badge, Button, Card, PageTitle } from "@/components/ui";
+import { Alert, Badge, Button, Card, PageTitle } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 
 /**
  * Monetization UI (scope §21). Deliberately presentational: no metering, no
@@ -55,10 +56,10 @@ export default async function PlansPage() {
     <>
       <PageTitle title="Plans" subtitle="Candidates are always free. Employers pay to hire." />
 
-      <div className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        💡 Preview only — billing isn&apos;t connected yet. Everything is unlocked
+      <Alert tone="info" className="mb-4">
+        Preview only — billing isn&apos;t connected yet. Everything is unlocked
         during the pilot.
-      </div>
+      </Alert>
 
       <div className="space-y-3">
         {PLANS.map((p) => (
@@ -79,8 +80,8 @@ export default async function PlansPage() {
             </p>
             <ul className="mt-3 space-y-1.5">
               {p.features.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-sm text-slate-700">
-                  <span className="text-success">✓</span>
+                <li key={f} className="flex items-start gap-2 text-sm text-subtle">
+                  <Icon name="check" className="mt-0.5 h-4 w-4 text-success" />
                   {f}
                 </li>
               ))}

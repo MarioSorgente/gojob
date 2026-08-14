@@ -1,16 +1,32 @@
 import Link from "next/link";
-import type { Job, MatchBreakdown } from "@/lib/types";
-import { formatSalaryRange } from "@/lib/cn";
-import { Badge } from "../ui";
+import type { CandidateAction, Job, MatchBreakdown } from "@/lib/types";
+import { formatRelativeTime, formatSalary } from "@/lib/format";
+import type { Locale } from "@/lib/i18n/config";
+import type { Translate } from "@/lib/i18n/dictionary";
+import { areaLabel, employmentTypeLabel, roleLabel } from "@/lib/i18n/taxonomy";
+import { Avatar, Badge } from "../ui";
+import { Icon } from "../Icon";
 import { MatchPercent, ReasonList } from "./match";
 import { MatchExplain } from "./MatchExplain";
 
+/**
+ * A job in a result list.
+ *
+ * The hierarchy follows JobStreet Indonesia, because it is the order a job
+ * seeker actually scans in: who is hiring → for what → where → for how much →
+ * how fresh is this. Two things were missing entirely before: the posting age
+ * (a listing with no date reads as possibly dead) and whether the candidate has
+ * already acted on it, which meant the feed kept re-offering dead ends.
+ */
 export function JobCard({
   job,
   score,
   reasons,
   breakdown,
   href,
+  action,
+  locale,
+  t,
 }: {
   job: Job;
   score?: number;
@@ -18,63 +34,95 @@ export function JobCard({
   /** When present the score becomes tappable and explains itself. */
   breakdown?: MatchBreakdown;
   href?: string;
+  /** What this candidate has already done with the job, if anything. */
+  action?: CandidateAction;
+  locale: Locale;
+  t: Translate;
 }) {
+  const salary = formatSalary(job.salaryType, job.salaryMin, job.salaryMax, locale);
+  const acted = action === "applied" || action === "passed";
+
   return (
     // A "stretched link": the anchor covers the card, and controls that need
     // their own click sit above it. Wrapping the card in <Link> instead would
     // put a <button> inside an <a> — invalid markup that also swallows keyboard
     // activation of the inner control.
-    <div className="relative h-full rounded-2xl border border-border bg-surface p-4 shadow-sm transition-all hover:border-brand/40 hover:shadow-md focus-within:ring-2 focus-within:ring-brand/40">
+    <article
+      className={`relative flex h-full flex-col rounded-card border border-border bg-surface p-4 shadow-card transition-[border-color,box-shadow] hover:border-brand/40 hover:shadow-raised focus-within:ring-2 focus-within:ring-brand/40 ${
+        acted ? "opacity-75" : ""
+      }`}
+    >
       {href && (
-        <Link
-          href={href}
-          className="absolute inset-0 z-0 rounded-2xl outline-none"
-        >
+        <Link href={href} className="absolute inset-0 z-0 rounded-card outline-none">
           <span className="sr-only">
-            {job.role} at {job.businessName}
+            {roleLabel(job.role, locale)} — {job.businessName}
           </span>
         </Link>
       )}
 
-      <div className="relative flex items-start justify-between gap-3">
-        <div className="min-w-0 max-w-prose">
-          <h3 className="font-bold leading-tight">{job.role}</h3>
-          <p className="truncate text-sm text-muted">{job.businessName}</p>
+      <div className="relative flex items-start gap-3">
+        <Avatar name={job.businessName} size={44} />
+
+        <div className="min-w-0 flex-1">
+          <h3 className="font-bold leading-tight">{roleLabel(job.role, locale)}</h3>
+          <p className="mt-0.5 flex items-center gap-1.5 truncate text-sm text-muted">
+            {job.businessName}
+            {job.businessVerified && (
+              <Icon
+                name="checkBadge"
+                className="h-3.5 w-3.5 shrink-0 text-success"
+                title={t("job.verifiedBusiness")}
+              />
+            )}
+          </p>
         </div>
+
         {score != null &&
           (breakdown ? (
             <div className="relative z-10 shrink-0">
-              <MatchExplain
-                score={score}
-                breakdown={breakdown}
-                reasons={reasons}
-              />
+              <MatchExplain score={score} breakdown={breakdown} reasons={reasons} />
             </div>
           ) : (
             <MatchPercent score={score} className="shrink-0" />
           ))}
       </div>
 
-      <div className="relative mt-2 flex max-w-prose flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
-        {job.businessVerified ? (
-          <Badge tone="green">✓ Verified</Badge>
-        ) : (
-          <Badge tone="slate">Unverified</Badge>
-        )}
-        <span>📍 {job.area}</span>
-        <span>· {job.employmentType}</span>
+      <div className="relative mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted">
+        <span className="inline-flex items-center gap-1">
+          <Icon name="mapPin" className="h-4 w-4" />
+          {areaLabel(job.area, locale)}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Icon name="clock" className="h-4 w-4" />
+          {employmentTypeLabel(job.employmentType, locale)}
+        </span>
       </div>
 
-      <p className="relative mt-2 font-semibold text-slate-800">
-        💰{" "}
-        {formatSalaryRange(job.salaryType, job.salaryMin, job.salaryMax) || "—"}
+      <p className="relative mt-2 inline-flex items-center gap-1.5 font-semibold">
+        <Icon name="wallet" className="h-4 w-4 text-muted" />
+        {salary || (
+          <span className="font-normal text-muted">{t("job.salaryUndisclosed")}</span>
+        )}
       </p>
 
       {reasons && reasons.length > 0 && (
-        <div className="relative mt-3 max-w-prose">
-          <ReasonList reasons={reasons} limit={3} />
+        <div className="relative mt-3">
+          <ReasonList reasons={reasons} limit={2} />
         </div>
       )}
-    </div>
+
+      <div className="relative mt-3 flex items-center justify-between gap-2 border-t border-border/70 pt-2.5 text-xs text-muted">
+        <span>
+          {t("job.postedAgo", { time: formatRelativeTime(job.createdAt, locale) })}
+        </span>
+        {action === "applied" && (
+          <Badge tone="green">
+            <Icon name="check" className="h-3 w-3" />
+            {t("job.applied")}
+          </Badge>
+        )}
+        {action === "passed" && <Badge tone="slate">{t("job.passed")}</Badge>}
+      </div>
+    </article>
   );
 }

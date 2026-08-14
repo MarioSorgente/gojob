@@ -31,7 +31,7 @@ export default async function VerificationsPage() {
       </p>
 
       {nothingPending && (
-        <EmptyState icon="✅" title="Nothing to review" hint="The queue is empty." />
+        <EmptyState icon="checkBadge" title="Nothing to review" hint="The queue is empty." />
       )}
 
       {pendingIds.length > 0 && (

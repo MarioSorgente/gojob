@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listAllJobs } from "@/lib/repos/admin";
-import { formatSalaryRange } from "@/lib/cn";
+import { formatSalary } from "@/lib/format";
+import { DEFAULT_LOCALE } from "@/lib/i18n/config";
 import { Badge, Card, EmptyState } from "@/components/ui";
 import { JobStatusToggle } from "@/components/admin/JobStatusToggle";
 
@@ -17,7 +18,7 @@ export default async function AdminJobsPage() {
       </p>
 
       {jobs.length === 0 ? (
-        <EmptyState icon="📋" title="No jobs posted yet" />
+        <EmptyState icon="briefcase" title="No jobs posted yet" />
       ) : (
         <div className="space-y-2">
           {jobs.map((j) => (
@@ -30,10 +31,10 @@ export default async function AdminJobsPage() {
                   <Badge tone={tone[j.status]}>{j.status}</Badge>
                 </div>
                 <p className="truncate text-xs text-muted">
-                  {j.businessName} · 📍 {j.area} · {j.employmentType}
+                  {j.businessName} · {j.area} · {j.employmentType}
                 </p>
-                <p className="truncate text-xs text-slate-500">
-                  {formatSalaryRange(j.salaryType, j.salaryMin, j.salaryMax) || "—"} ·{" "}
+                <p className="truncate text-xs text-muted">
+                  {formatSalary(j.salaryType, j.salaryMin, j.salaryMax, DEFAULT_LOCALE) || "—"} ·{" "}
                   {j.createdAt?.slice(0, 10)}
                 </p>
               </div>

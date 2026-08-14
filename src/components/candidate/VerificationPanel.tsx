@@ -12,11 +12,17 @@ import { ImageUpload } from "@/components/ImageUpload";
 import { Badge, Button, Card } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import type { Experience, VerificationStatus } from "@/lib/types";
+import { Icon } from "@/components/Icon";
 
 function StatusBadge({ status }: { status: VerificationStatus }) {
   switch (status) {
     case "verified":
-      return <Badge tone="green">✓ Verified</Badge>;
+      return (
+      <Badge tone="green">
+        <Icon name="checkBadge" className="h-3.5 w-3.5" />
+        Verified
+      </Badge>
+    );
     case "pending":
       return <Badge tone="amber">Pending review</Badge>;
     case "rejected":

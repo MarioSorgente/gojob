@@ -1,23 +1,22 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { getBusinessByOwner } from "@/lib/repos/businesses";
 import { JobForm } from "@/components/employer/JobForm";
+import { BackLink } from "@/components/ui";
+import { getT } from "@/lib/i18n/server";
 
 export default async function NewJobPage() {
   const user = await requireRole("employer");
   const business = await getBusinessByOwner(user.uid);
   if (!business) redirect("/employer/onboarding");
 
+  const t = await getT();
+
   return (
     <div className="mx-auto max-w-md px-5 py-6">
-      <Link href="/employer" className="text-sm text-muted">
-        ← Cancel
-      </Link>
-      <h1 className="mt-2 text-2xl font-bold">Post a Job</h1>
-      <p className="mt-1 mb-4 text-sm text-muted">
-        Publish and instantly see matching candidates.
-      </p>
+      <BackLink href="/employer">{t("nav.jobs")}</BackLink>
+      <h1 className="type-title mt-2">{t("employer.postJob")}</h1>
+      <p className="mb-4 mt-1 text-sm text-muted">{t("employer.jobsSubtitle")}</p>
       <JobForm businessArea={business.area} />
     </div>
   );

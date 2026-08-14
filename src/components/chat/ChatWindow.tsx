@@ -1,18 +1,40 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { getClientAuth, getClientDb } from "@/lib/firebase/client";
 import { markReadAction, sendMessageAction } from "@/app/_actions/chat";
 import { useToast } from "@/components/Toast";
 import { Spinner } from "@/components/ui";
+import { Icon } from "@/components/Icon";
+import { useI18n } from "@/lib/i18n/client";
+import { dayKey, formatDayLabel, formatTime } from "@/lib/format";
+import type { Locale } from "@/lib/i18n/config";
 import { cn } from "@/lib/cn";
 import type { Message } from "@/lib/types";
 
-function timeLabel(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+/**
+ * Group consecutive messages into day buckets, and mark the ones that continue
+ * the previous sender so a run of replies reads as one block instead of a
+ * stack of identical bubbles.
+ */
+function groupByDay(messages: Message[], locale: Locale) {
+  const days: { key: string; iso: string; items: (Message & { continues: boolean })[] }[] =
+    [];
+  for (const message of messages) {
+    const key = dayKey(message.createdAt, locale);
+    let day = days[days.length - 1];
+    if (!day || day.key !== key) {
+      day = { key, iso: message.createdAt, items: [] };
+      days.push(day);
+    }
+    const previous = day.items[day.items.length - 1];
+    day.items.push({
+      ...message,
+      continues: previous?.senderId === message.senderId,
+    });
+  }
+  return days;
 }
 
 export function ChatWindow({
@@ -24,6 +46,7 @@ export function ChatWindow({
   uid: string;
   initialMessages: Message[];
 }) {
+  const { locale, t } = useI18n();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -71,8 +94,15 @@ export function ChatWindow({
   }, [conversationId]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Honour the OS motion preference — an auto-scrolling chat is exactly the
+    // kind of movement `prefers-reduced-motion` exists for.
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    endRef.current?.scrollIntoView({ behavior: reduced ? "auto" : "smooth" });
   }, [messages]);
+
+  const days = useMemo(() => groupByDay(messages, locale), [messages, locale]);
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -101,7 +131,7 @@ export function ChatWindow({
       }
     } catch {
       setText(body);
-      show("Message not sent. Check your connection and try again.", "error");
+      show(t("chat.sendFailed"), "error");
     } finally {
       setSending(false);
     }
@@ -109,32 +139,57 @@ export function ChatWindow({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex-1 space-y-2 overflow-y-auto px-1 py-3">
+      <div
+        className="flex-1 space-y-2 overflow-y-auto px-1 py-3"
+        role="log"
+        aria-live="polite"
+        aria-label={t("chat.messages")}
+      >
         {messages.length === 0 && (
-          <p className="mt-6 text-center text-sm text-muted">
-            You matched! Say hello 👋
-          </p>
+          <p className="mt-6 text-center text-sm text-muted">{t("chat.matchHint")}</p>
         )}
-        {messages.map((m) => {
-          const mine = m.senderId === uid;
-          return (
-            <div key={m.id} className={cn("flex", mine ? "justify-end" : "justify-start")}>
-              <div
-                className={cn(
-                  "max-w-[78%] rounded-2xl px-3.5 py-2 text-sm",
-                  mine
-                    ? "rounded-br-sm bg-brand text-white"
-                    : "rounded-bl-sm bg-white text-slate-800 shadow-sm",
-                )}
-              >
-                <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                <p className={cn("mt-0.5 text-[10px]", mine ? "text-white/70" : "text-slate-400")}>
-                  {timeLabel(m.createdAt)}
-                </p>
-              </div>
-            </div>
-          );
-        })}
+
+        {days.map((day) => (
+          <div key={day.key} className="space-y-1">
+            <p className="sticky top-0 z-10 my-3 text-center">
+              <span className="rounded-full bg-surface-muted px-3 py-1 text-[11px] font-semibold text-muted">
+                {formatDayLabel(day.iso, locale)}
+              </span>
+            </p>
+            {day.items.map((m) => {
+              const mine = m.senderId === uid;
+              return (
+                <div
+                  key={m.id}
+                  className={cn(
+                    "flex",
+                    mine ? "justify-end" : "justify-start",
+                    m.continues ? "mt-0.5" : "mt-2",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "max-w-[78%] rounded-panel px-3.5 py-2 text-sm",
+                      mine
+                        ? "rounded-br-sm bg-brand text-white"
+                        : "rounded-bl-sm bg-surface text-foreground shadow-card",
+                    )}
+                  >
+                    <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                    <p
+                      className={cn(
+                        "mt-0.5 text-[10px] tabular-nums",
+                        mine ? "text-white/70" : "text-muted",
+                      )}
+                    >
+                      {formatTime(m.createdAt, locale)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
         <div ref={endRef} />
       </div>
 
@@ -142,20 +197,29 @@ export function ChatWindow({
         onSubmit={send}
         className="flex items-center gap-2 border-t border-border bg-surface p-3"
       >
+        <label htmlFor="chat-message" className="sr-only">
+          {t("chat.messageLabel")}
+        </label>
         <input
+          id="chat-message"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Type a message…"
-          className="h-11 flex-1 rounded-full border border-border bg-white px-4 text-sm outline-none focus:border-brand"
+          placeholder={t("chat.messagePlaceholder")}
+          autoComplete="off"
+          className="h-11 flex-1 rounded-full border border-border bg-surface px-4 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
         />
         <button
           type="submit"
           className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand text-white outline-none transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
           // Disabling while in flight stops a double-tap sending twice.
           disabled={!text.trim() || sending}
-          aria-label="Send"
+          aria-label={t("chat.send")}
         >
-          {sending ? <Spinner className="border-white" /> : "➤"}
+          {sending ? (
+            <Spinner className="border-white" />
+          ) : (
+            <Icon name="send" className="h-5 w-5" />
+          )}
         </button>
       </form>
     </div>

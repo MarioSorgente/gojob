@@ -1,21 +1,37 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { AuthPageShell } from "@/components/auth/AuthPageShell";
+import { getSessionUser, homePathFor } from "@/lib/auth";
+import { safeNextPath } from "@/lib/nextPath";
+import { getT } from "@/lib/i18n/server";
 
-export default function RegisterPage() {
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  // Same reverse guard as /login — see the note there.
+  const [user, sp, t] = await Promise.all([
+    getSessionUser(),
+    searchParams,
+    getT(),
+  ]);
+  if (user) redirect(safeNextPath(sp.next, homePathFor(user)));
+
   return (
     <AuthPageShell
-      title="Create your account"
-      description="Free to join. Set up your profile in a minute."
+      title={t("auth.registerTitle")}
+      description={t("auth.registerDescription")}
       footer={
         <>
-          Already have an account?{" "}
+          {t("auth.haveAccount")}{" "}
           <Link
             href="/login"
-            className="font-semibold text-brand hover:text-brand-dark"
+            className="rounded font-semibold text-brand outline-none hover:text-brand-dark focus-visible:ring-2 focus-visible:ring-brand/40"
           >
-            Log in
+            {t("common.logIn")}
           </Link>
         </>
       }

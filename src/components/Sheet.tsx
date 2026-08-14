@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { Icon } from "./Icon";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * The app's one overlay primitive: a bottom sheet on phones, a centred dialog
@@ -35,6 +37,7 @@ export function Sheet({
   className?: string;
   hideHeader?: boolean;
 }) {
+  const t = useT();
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusTo = useRef<HTMLElement | null>(null);
   const titleId = useId();
@@ -117,7 +120,7 @@ export function Sheet({
         // Clicks inside must not reach the backdrop's close handler.
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-surface p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-xl outline-none sm:rounded-3xl sm:pb-6",
+          "max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-panel bg-surface p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-overlay outline-none sm:rounded-panel sm:pb-6",
           className,
         )}
       >
@@ -136,10 +139,10 @@ export function Sheet({
             <button
               type="button"
               onClick={close}
-              aria-label="Close"
-              className="-m-2 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-xl text-muted outline-none transition-colors hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-brand/40"
+              aria-label={t("common.close")}
+              className="-m-2 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted outline-none transition-colors hover:bg-surface-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
             >
-              ✕
+              <Icon name="close" />
             </button>
           )}
         </div>

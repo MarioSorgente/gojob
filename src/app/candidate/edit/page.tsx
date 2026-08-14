@@ -1,9 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { getCandidate } from "@/lib/repos/candidates";
 import { OnboardingForm } from "@/components/candidate/OnboardingForm";
 import type { CandidateOnboardingInput } from "@/lib/forms";
+import { BackLink } from "@/components/ui";
+import { getT } from "@/lib/i18n/server";
 
 export default async function CandidateEditPage() {
   const user = await requireRole("candidate");
@@ -35,14 +36,14 @@ export default async function CandidateEditPage() {
     })),
   };
 
+  const t = await getT();
+
   return (
     <div className="mx-auto max-w-md px-5 py-6">
-      <Link href="/candidate/profile" className="text-sm text-muted">
-        ← Back to profile
-      </Link>
-      <h1 className="mt-2 text-2xl font-bold">Edit profile</h1>
+      <BackLink href="/candidate/profile">{t("nav.profile")}</BackLink>
+      <h1 className="type-title mt-2">{t("candidate.editProfile")}</h1>
       <div className="mt-4">
-        <OnboardingForm defaults={defaults} submitLabel="Save changes" />
+        <OnboardingForm defaults={defaults} submitLabel={t("common.save")} />
       </div>
     </div>
   );

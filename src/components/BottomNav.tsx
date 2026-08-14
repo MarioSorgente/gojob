@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
+import { Icon } from "./Icon";
 import { activeNavHref, type NavItem } from "./navigation";
 
 export type { NavItem };
@@ -31,13 +32,12 @@ export function BottomNav({ items }: { items: NavItem[] }) {
               href={item.href}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium outline-none transition-colors active:bg-slate-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40",
-                isActive ? "text-brand" : "text-slate-400",
+                "relative flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium leading-none outline-none transition-colors active:bg-surface-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40",
+                // `text-slate-400` was 2.85:1 on white — below the 4.5:1 floor.
+                isActive ? "text-brand" : "text-muted",
               )}
             >
-              <span aria-hidden="true" className="text-xl leading-none">
-                {item.icon}
-              </span>
+              <Icon name={item.icon} className="h-5 w-5" />
               {item.label}
               {item.badge ? (
                 <span className="absolute left-1/2 top-1.5 ml-1.5 rounded-full bg-accent px-1.5 text-[10px] font-bold tabular-nums text-white">

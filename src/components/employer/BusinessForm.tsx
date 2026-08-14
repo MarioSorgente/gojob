@@ -6,7 +6,7 @@ import { createBusinessAction } from "@/app/employer/onboarding/actions";
 import { updateBusinessAction } from "@/app/employer/business-actions";
 import { AREAS, BUSINESS_CATEGORIES } from "@/lib/taxonomy";
 import type { BusinessOnboardingInput } from "@/lib/forms";
-import { Button, Field, Input, Select, Textarea } from "@/components/ui";
+import { Alert, Button, Field, Input, Select, Textarea } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 
 export function BusinessForm({
@@ -92,7 +92,7 @@ export function BusinessForm({
           placeholder="Jl. Pantai Berawa No.52"
         />
       </Field>
-      <Field label="Google Maps link" hint="Adding this verifies your business ✓">
+      <Field label="Google Maps link" hint="Adding this verifies your business">
         <Input
           value={googleMapsUrl}
           onChange={(e) => setGoogleMapsUrl(e.target.value)}
@@ -124,7 +124,7 @@ export function BusinessForm({
       </Field>
 
       {error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        <Alert tone="danger">{error}</Alert>
       )}
 
       <Button type="submit" size="lg" className="w-full" disabled={pending}>

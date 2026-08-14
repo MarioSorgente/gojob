@@ -1,8 +1,16 @@
+import Link from "next/link";
+import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth";
 import { listConversationsForUser } from "@/lib/repos/chat";
-import { EmptyState, PageTitle } from "@/components/ui";
+import { getI18n } from "@/lib/i18n/server";
+import { ButtonLink, EmptyState, PageTitle } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 import { ConversationInbox } from "@/components/ConversationInbox";
-import Link from "next/link";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("chat.title") };
+}
 
 export default async function CandidateMatchesPage({
   searchParams,
@@ -11,19 +19,22 @@ export default async function CandidateMatchesPage({
 }) {
   const user = await requireRole("candidate");
   const { cursor } = await searchParams;
-  const page = await listConversationsForUser(user.uid, cursor ?? null);
+  const [page, { locale, t }] = await Promise.all([
+    listConversationsForUser(user.uid, cursor ?? null),
+    getI18n(),
+  ]);
 
   return (
     <>
-      <PageTitle
-        title="Chats"
-        subtitle="Your matches — chat opens on mutual interest"
-      />
+      <PageTitle title={t("chat.title")} subtitle={t("chat.subtitle")} />
       {page.items.length === 0 ? (
         <EmptyState
-          icon="💬"
-          title="No matches yet"
-          hint="When you and an employer both show interest, a chat opens here."
+          icon="chat"
+          title={t("chat.noConversations")}
+          hint={t("chat.noConversationsHint")}
+          action={
+            <ButtonLink href="/candidate/search">{t("filter.searchJobs")}</ButtonLink>
+          }
         />
       ) : (
         <ConversationInbox
@@ -31,15 +42,18 @@ export default async function CandidateMatchesPage({
           uid={user.uid}
           basePath="/candidate/chat"
           viewer="candidate"
+          locale={locale}
+          t={t}
         />
       )}
       {page.nextCursor && (
         <div className="mt-4 text-center">
           <Link
-            className="text-sm font-semibold text-brand"
+            className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-sm font-semibold text-brand outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             href={`?cursor=${encodeURIComponent(page.nextCursor)}`}
           >
-            Older conversations →
+            {t("common.loadMore")}
+            <Icon name="arrowRight" className="h-4 w-4" />
           </Link>
         </div>
       )}

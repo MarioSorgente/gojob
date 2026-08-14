@@ -15,8 +15,17 @@ import {
   type ProficiencyLevel,
   type SalaryType,
 } from "@/lib/taxonomy";
-import { Button, Chip, Field, Input, Select } from "@/components/ui";
+import {
+  Alert,
+  Button,
+  Chip,
+  Field,
+  Input,
+  SectionCard,
+  Select,
+} from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { Icon } from "@/components/Icon";
 
 const ROLE_CATEGORY: Record<string, string[]> = {
   Barista: ["Barista", "General"],
@@ -33,23 +42,6 @@ const ROLE_CATEGORY: Record<string, string[]> = {
   Housekeeping: ["Housekeeping", "General"],
   "Spa Therapist": ["Spa", "General"],
 };
-
-function SectionCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-surface p-4">
-      <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">
-        {title}
-      </h2>
-      <div className="space-y-3">{children}</div>
-    </section>
-  );
-}
 
 function MultiChips({
   options,
@@ -328,8 +320,9 @@ export function OnboardingForm({
               type="button"
               variant="subtle"
               onClick={() => setLanguages(languages.filter((_, j) => j !== i))}
+              aria-label="Remove language"
             >
-              ✕
+              <Icon name="close" className="h-4 w-4" />
             </Button>
           </div>
         ))}
@@ -467,7 +460,7 @@ export function OnboardingForm({
       </SectionCard>
 
       {error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        <Alert tone="danger">{error}</Alert>
       )}
 
       <div className="fixed inset-x-0 bottom-0 border-t border-border bg-surface/95 p-4 backdrop-blur">

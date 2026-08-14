@@ -1,11 +1,13 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Icon } from "../Icon";
 import { ChatWindow } from "./ChatWindow";
 import { InterviewSection } from "./InterviewSection";
 import type { Interview, Message } from "@/lib/types";
 
 export function ChatWorkspace({
   backHref,
+  backLabel,
   conversationId,
   headerAction,
   initialMessages,
@@ -15,6 +17,8 @@ export function ChatWorkspace({
   uid,
 }: {
   backHref: string;
+  /** Accessible name for the back control, already translated. */
+  backLabel: string;
   conversationId: string;
   headerAction?: ReactNode;
   initialMessages: Message[];
@@ -29,8 +33,13 @@ export function ChatWorkspace({
       className="chat-workspace flex h-full min-h-0 w-full flex-col overflow-hidden bg-background"
     >
       <header className="flex shrink-0 items-center gap-3 border-b border-border bg-surface px-4 py-3">
-        <Link href={backHref} className="text-muted" aria-label="Back to chats">
-          ←
+        {/* A bare "←" glyph in a text node is a ~16px tap target. */}
+        <Link
+          href={backHref}
+          aria-label={backLabel}
+          className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted outline-none transition-colors hover:bg-surface-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40"
+        >
+          <Icon name="arrowLeft" />
         </Link>
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold leading-tight">
@@ -41,7 +50,9 @@ export function ChatWorkspace({
         {headerAction}
       </header>
 
-      <div className="max-h-[45%] shrink-0 overflow-y-auto border-b border-border bg-surface px-4 py-2">
+      {/* Capped lower than the previous 45%: interview cards were taking up
+          nearly half the chat viewport on a phone. */}
+      <div className="max-h-[32%] shrink-0 overflow-y-auto border-b border-border bg-surface px-4 py-2">
         <InterviewSection
           conversationId={conversationId}
           uid={uid}

@@ -3,7 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { applyToJobAction, passJobAction } from "@/app/candidate/actions";
-import { Button, Spinner } from "@/components/ui";
+import { Alert, Button, Spinner } from "@/components/ui";
+import { Icon } from "@/components/Icon";
+import { useT } from "@/lib/i18n/client";
 import { MatchCelebration } from "@/components/MatchCelebration";
 import { useToast } from "@/components/Toast";
 
@@ -17,6 +19,7 @@ export function JobActions({
   businessName: string;
 }) {
   const router = useRouter();
+  const t = useT();
   const { show } = useToast();
   const [pending, start] = useTransition();
   const [applied, setApplied] = useState(initialApplied);
@@ -49,9 +52,9 @@ export function JobActions({
 
   if (applied && !matchHref) {
     return (
-      <div className="rounded-xl bg-green-50 px-4 py-3 text-center text-sm font-semibold text-green-700">
-        ✓ Applied — we&apos;ll let you know if {businessName} is interested.
-      </div>
+      <Alert tone="success" title={t("job.applied")}>
+        {businessName}
+      </Alert>
     );
   }
 
@@ -59,17 +62,17 @@ export function JobActions({
     <>
       <div className="grid grid-cols-2 gap-3">
         <Button variant="outline" size="lg" onClick={pass} disabled={pending}>
-          Pass
+          {t("employer.pass")}
         </Button>
         <Button size="lg" onClick={apply} disabled={pending}>
-          {pending ? <Spinner /> : null}
-          Apply
+          {pending ? <Spinner /> : <Icon name="send" className="h-4 w-4" />}
+          {t("job.apply")}
         </Button>
       </div>
       <MatchCelebration
         open={!!matchHref}
         chatHref={matchHref ?? "#"}
-        subtitle={`You and ${businessName} are connected.`}
+        subtitle={businessName}
         // Without this the overlay had no dismiss control at all — the only way
         // out of a successful match was to open the chat.
         onClose={() => {

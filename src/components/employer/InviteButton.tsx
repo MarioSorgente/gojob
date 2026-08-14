@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { employerActionOnCandidate } from "@/app/employer/actions";
-import { Button } from "@/components/ui";
+import { Button, Spinner } from "@/components/ui";
+import { useT } from "@/lib/i18n/client";
 import { MatchCelebration } from "@/components/MatchCelebration";
 
 export function InviteButton({
@@ -16,6 +17,7 @@ export function InviteButton({
   name: string;
 }) {
   const router = useRouter();
+  const t = useT();
   const [pending, start] = useTransition();
   const [matchHref, setMatchHref] = useState<string | null>(null);
 
@@ -33,12 +35,13 @@ export function InviteButton({
   return (
     <>
       <Button size="sm" onClick={invite} disabled={pending}>
-        {pending ? "…" : "Invite"}
+        {pending ? <Spinner /> : null}
+        {t("employer.invite")}
       </Button>
       <MatchCelebration
         open={!!matchHref}
         chatHref={matchHref ?? "#"}
-        subtitle={`You and ${name} are connected.`}
+        subtitle={name}
         onClose={() => {
           setMatchHref(null);
           router.refresh();

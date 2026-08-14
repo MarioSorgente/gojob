@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { respondInvitationAction } from "@/app/candidate/actions";
-import { Button } from "@/components/ui";
+import { Button, Spinner } from "@/components/ui";
+import { useT } from "@/lib/i18n/client";
 import { MatchCelebration } from "@/components/MatchCelebration";
 
 export function InvitationActions({
@@ -14,6 +15,7 @@ export function InvitationActions({
   businessName: string;
 }) {
   const router = useRouter();
+  const t = useT();
   const [pending, start] = useTransition();
   const [matchHref, setMatchHref] = useState<string | null>(null);
 
@@ -39,16 +41,24 @@ export function InvitationActions({
     <>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <Button variant="outline" onClick={decline} disabled={pending}>
-          Decline
+          {t("candidate.decline")}
         </Button>
         <Button onClick={accept} disabled={pending}>
-          {pending ? "…" : "Accept"}
+          {pending ? <Spinner /> : null}
+          {t("candidate.accept")}
         </Button>
       </div>
+      {/* onClose is required, not optional: without it the overlay had no
+          dismiss control at all and the only way out of a successful match was
+          to open the chat. */}
       <MatchCelebration
         open={!!matchHref}
         chatHref={matchHref ?? "#"}
-        subtitle={`You and ${businessName} are connected.`}
+        subtitle={businessName}
+        onClose={() => {
+          setMatchHref(null);
+          router.refresh();
+        }}
       />
     </>
   );
