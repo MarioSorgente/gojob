@@ -10,6 +10,10 @@ export interface CandidateSearchMetric {
   latencyMs: number;
   exhausted: boolean;
   usedIndexFallback: boolean;
+  /** True when the safe fallback stopped before reading the whole collection. */
+  fallbackBudgetExhausted: boolean;
+  /** Filter names (never values) used to choose worthwhile query indexes. */
+  activeFilters: (keyof import("./search").CandidateFilters)[];
   /** Names only make filter adoption observable without exposing values. */
   activeFilterCount: number;
 }
