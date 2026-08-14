@@ -16,7 +16,7 @@ export default async function AdminUsersPage() {
       <p className="mb-5 text-sm text-muted">{users.length} total</p>
 
       {users.length === 0 ? (
-        <EmptyState icon="👤" title="No users yet" />
+        <EmptyState icon="users" title="No users yet" />
       ) : (
         <Card className="divide-y divide-border">
           {users.map((u) => (

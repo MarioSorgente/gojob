@@ -5,6 +5,7 @@ import {
   getMessages,
   listInterviewsForConversation,
 } from "@/lib/repos/chat";
+import { getT } from "@/lib/i18n/server";
 import { ChatWorkspace } from "@/components/chat/ChatWorkspace";
 
 export default async function CandidateChatPage({
@@ -23,8 +24,11 @@ export default async function CandidateChatPage({
     listInterviewsForConversation(conversationId),
   ]);
 
+  const t = await getT();
+
   return (
     <ChatWorkspace
+      backLabel={t("chat.title")}
       backHref="/candidate/matches"
       conversationId={conversationId}
       initialMessages={messages}

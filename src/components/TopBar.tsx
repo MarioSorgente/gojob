@@ -1,23 +1,25 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Logo } from "./brand";
+import { BackLink } from "./ui";
 
 export function TopBar({
   right,
   back,
 }: {
   right?: ReactNode;
-  back?: { href: string; label?: string };
+  back?: { href: string; label: string };
 }) {
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-surface/95 backdrop-blur">
-      <div className="mx-auto flex max-w-md items-center justify-between px-5 py-3">
+      <div className="mx-auto flex max-w-md items-center justify-between gap-3 px-5 py-2">
         {back ? (
-          <Link href={back.href} className="text-sm font-medium text-muted">
-            ← {back.label ?? "Back"}
-          </Link>
+          <BackLink href={back.href}>{back.label}</BackLink>
         ) : (
-          <Link href="/">
+          <Link
+            href="/"
+            className="rounded outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          >
             <Logo size="sm" />
           </Link>
         )}

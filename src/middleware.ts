@@ -8,13 +8,20 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/session";
 
 export function middleware(request: NextRequest) {
-  const hasSession = request.cookies.has(SESSION_COOKIE);
-  if (!hasSession) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", request.nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-  return NextResponse.next();
+  if (request.cookies.has(SESSION_COOKIE)) return NextResponse.next();
+
+  const loginUrl = new URL("/login", request.url);
+  // `pathname + search`, not just the pathname: a deep link carrying filters
+  // used to lose them on the way through login.
+  loginUrl.searchParams.set(
+    "next",
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+  );
+
+  const response = NextResponse.redirect(loginUrl);
+  // Without this the 307 itself is cacheable and can be replayed after sign-in.
+  response.headers.set("Cache-Control", "no-store, must-revalidate");
+  return response;
 }
 
 export const config = {

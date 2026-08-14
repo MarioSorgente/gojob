@@ -7,19 +7,19 @@ import { activeNavHref, type NavItem } from "./navigation";
  */
 
 const CANDIDATE: NavItem[] = [
-  { href: "/candidate", label: "For you", icon: "" },
-  { href: "/candidate/search", label: "Search", icon: "" },
-  { href: "/candidate/invitations", label: "Invites", icon: "" },
-  { href: "/candidate/matches", label: "Chats", icon: "" },
-  { href: "/candidate/profile", label: "Profile", icon: "" },
+  { href: "/candidate", label: "For you", icon: "search" },
+  { href: "/candidate/search", label: "Search", icon: "search" },
+  { href: "/candidate/invitations", label: "Invites", icon: "search" },
+  { href: "/candidate/matches", label: "Chats", icon: "search" },
+  { href: "/candidate/profile", label: "Profile", icon: "search" },
 ];
 
 const EMPLOYER: NavItem[] = [
-  { href: "/employer", label: "Jobs", icon: "" },
-  { href: "/employer/candidates", label: "Find", icon: "" },
-  { href: "/employer/shortlist", label: "Shortlist", icon: "" },
-  { href: "/employer/matches", label: "Chats", icon: "" },
-  { href: "/employer/business", label: "Venue", icon: "" },
+  { href: "/employer", label: "Jobs", icon: "search" },
+  { href: "/employer/candidates", label: "Find", icon: "search" },
+  { href: "/employer/shortlist", label: "Shortlist", icon: "search" },
+  { href: "/employer/matches", label: "Chats", icon: "search" },
+  { href: "/employer/business", label: "Venue", icon: "search" },
 ];
 
 describe("activeNavHref", () => {
@@ -56,9 +56,9 @@ describe("activeNavHref", () => {
 
   it("prefers the longest match when tabs nest", () => {
     const items: NavItem[] = [
-      { href: "/employer", label: "Jobs", icon: "" },
-      { href: "/employer/candidates", label: "Find", icon: "" },
-      { href: "/employer/candidates/saved", label: "Saved", icon: "" },
+      { href: "/employer", label: "Jobs", icon: "search" },
+      { href: "/employer/candidates", label: "Find", icon: "search" },
+      { href: "/employer/candidates/saved", label: "Saved", icon: "search" },
     ];
     expect(activeNavHref("/employer/candidates/saved/x", items)).toBe(
       "/employer/candidates/saved",

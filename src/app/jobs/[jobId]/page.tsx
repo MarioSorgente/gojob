@@ -2,10 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getJob } from "@/lib/repos/jobs";
-import { getSessionUser } from "@/lib/auth";
-import { formatSalaryRange } from "@/lib/cn";
-import { Badge, ButtonLink, Card } from "@/components/ui";
+import { getSessionUser, homePathFor } from "@/lib/auth";
+import { formatSalary } from "@/lib/format";
+import { getI18n } from "@/lib/i18n/server";
+import { DEFAULT_LOCALE } from "@/lib/i18n/config";
+import { ButtonLink, Card } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 import { Logo } from "@/components/brand";
+import { LocaleSwitcher } from "@/components/LocaleSwitcher";
+import { BfcacheGuard } from "@/components/BfcacheGuard";
+import { JobDetail } from "@/components/cards/JobDetail";
 
 export async function generateMetadata({
   params,
@@ -14,10 +20,17 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { jobId } = await params;
   const job = await getJob(jobId).catch(() => null);
-  if (!job) return { title: "Job not found — GoJob" };
-  const salary = formatSalaryRange(job.salaryType, job.salaryMin, job.salaryMax);
+  if (!job) return { title: "Job not found" };
+  // Metadata is crawled and shared, so it stays in the default locale rather
+  // than following whoever happened to request it.
+  const salary = formatSalary(
+    job.salaryType,
+    job.salaryMin,
+    job.salaryMax,
+    DEFAULT_LOCALE,
+  );
   return {
-    title: `${job.role} at ${job.businessName} — GoJob`,
+    title: `${job.role} at ${job.businessName}`,
     description: `${job.employmentType} in ${job.area}. ${salary}. Apply through GoJob.`,
     openGraph: {
       title: `${job.role} at ${job.businessName}`,
@@ -39,9 +52,7 @@ export default async function PublicJobPage({
   const job = await getJob(jobId).catch(() => null);
   if (!job || job.status !== "live") notFound();
 
-  const user = await getSessionUser();
-  const required = job.skills.filter((s) => s.required);
-  const preferred = job.skills.filter((s) => !s.required);
+  const [user, { locale, t }] = await Promise.all([getSessionUser(), getI18n()]);
 
   // Signed-in candidates go straight to the in-app job; everyone else registers
   // first and is returned here afterwards.
@@ -52,90 +63,70 @@ export default async function PublicJobPage({
         ? "/onboarding"
         : `/register?role=candidate&next=${encodeURIComponent(`/candidate/jobs/${job.id}`)}`;
 
+  const applyButton = (
+    <ButtonLink href={applyHref} size="lg" className="w-full">
+      {t("job.applyViaGoJob")}
+      <Icon name="arrowRight" className="h-4 w-4" />
+    </ButtonLink>
+  );
+
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col px-5">
-      <header className="flex items-center justify-between py-5">
-        <Link href="/">
-          <Logo />
-        </Link>
-        {!user && (
-          <Link href="/login" className="text-sm font-semibold text-brand">
-            Log in
+    <div className="min-h-dvh bg-background">
+      <BfcacheGuard />
+
+      <header className="border-b border-border bg-surface">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-5 py-4 lg:px-8">
+          <Link
+            href="/"
+            className="rounded outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          >
+            <Logo />
           </Link>
-        )}
+          <div className="flex items-center gap-3">
+            <LocaleSwitcher current={locale} />
+            {/* Session-aware, like the landing page: a signed-in visitor who
+                followed a shared link must not be shown "Log in". */}
+            {user ? (
+              <ButtonLink href={homePathFor(user)} size="sm" variant="outline">
+                {t("common.dashboard")}
+              </ButtonLink>
+            ) : (
+              <Link
+                href="/login"
+                className="rounded px-1 py-1 text-sm font-semibold text-brand outline-none hover:text-brand-dark focus-visible:ring-2 focus-visible:ring-brand/40"
+              >
+                {t("common.logIn")}
+              </Link>
+            )}
+          </div>
+        </div>
       </header>
 
-      <main className="flex-1 space-y-4 pb-28">
-        <Card className="p-5">
-          <h1 className="text-2xl font-extrabold leading-tight">{job.role}</h1>
-          <p className="mt-0.5 text-muted">{job.businessName}</p>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted">
-            {job.businessVerified ? (
-              <Badge tone="green">✓ Verified Business</Badge>
-            ) : (
-              <Badge tone="slate">Unverified</Badge>
-            )}
-            <span>📍 {job.area}</span>
-            <span>· {job.employmentType}</span>
-          </div>
-          <p className="mt-3 text-xl font-bold">
-            💰 {formatSalaryRange(job.salaryType, job.salaryMin, job.salaryMax) || "—"}
-          </p>
-        </Card>
-
-        <Card className="p-5">
-          <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-muted">
-            What they&apos;re looking for
-          </h2>
-          <dl className="space-y-2 text-sm">
-            <Row label="Experience">
-              {job.minimumExperience > 0
-                ? `Minimum ${job.minimumExperience} year${job.minimumExperience === 1 ? "" : "s"}`
-                : "No minimum"}
-            </Row>
-            {required.length > 0 && (
-              <Row label="Must have">{required.map((s) => s.name).join(", ")}</Row>
-            )}
-            {preferred.length > 0 && (
-              <Row label="Nice to have">{preferred.map((s) => s.name).join(", ")}</Row>
-            )}
-            {job.languages.length > 0 && (
-              <Row label="Languages">
-                {job.languages.map((l) => `${l.language} (${l.minimumLevel}+)`).join(", ")}
-              </Row>
-            )}
-            {job.desiredStartDate && <Row label="Start">{job.desiredStartDate}</Row>}
-          </dl>
-          {job.description && (
-            <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">
-              {job.description}
-            </p>
-          )}
-        </Card>
-
-        <div className="rounded-2xl bg-brand-soft p-4 text-center">
-          <p className="text-sm font-semibold text-brand-dark">
-            No CV needed — build your profile once and apply to any venue in Bali.
-          </p>
-        </div>
+      <main className="mx-auto max-w-5xl px-5 pb-28 pt-5 lg:px-8 lg:pb-10">
+        <JobDetail
+          job={job}
+          locale={locale}
+          t={t}
+          actions={
+            <div className="space-y-4">
+              {/* The rail carries the CTA from lg up; below that the fixed bar
+                  at the bottom of the viewport does. */}
+              <Card className="hidden p-4 lg:block">{applyButton}</Card>
+              <div className="rounded-card bg-brand-soft p-4 text-center">
+                <p className="text-sm font-semibold text-brand-dark">
+                  {t("job.noCvNeeded")}
+                </p>
+              </div>
+            </div>
+          }
+        />
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 border-t border-border bg-surface/95 p-4 backdrop-blur">
-        <div className="mx-auto max-w-md">
-          <ButtonLink href={applyHref} size="lg" className="w-full">
-            Apply through GoJob →
-          </ButtonLink>
+      <div className="fixed inset-x-0 bottom-0 border-t border-border bg-surface/95 p-4 backdrop-blur lg:hidden">
+        <div className="mx-auto max-w-md pb-[env(safe-area-inset-bottom,0px)]">
+          {applyButton}
         </div>
       </div>
-    </div>
-  );
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <dt className="text-muted">{label}</dt>
-      <dd className="text-right font-medium text-slate-800">{children}</dd>
     </div>
   );
 }

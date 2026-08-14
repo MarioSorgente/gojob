@@ -14,6 +14,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/cn";
+import { Icon, type IconName } from "./Icon";
 
 type ToastTone = "success" | "error" | "info";
 
@@ -28,15 +29,15 @@ const ToastContext = createContext<{
 } | null>(null);
 
 const toneStyles: Record<ToastTone, string> = {
-  success: "bg-slate-900 text-white",
-  error: "bg-red-600 text-white",
-  info: "bg-slate-900 text-white",
+  success: "bg-foreground text-white",
+  error: "bg-danger text-white",
+  info: "bg-foreground text-white",
 };
 
-const toneIcon: Record<ToastTone, string> = {
-  success: "✓",
-  error: "!",
-  info: "•",
+const toneIcon: Record<ToastTone, IconName> = {
+  success: "check",
+  error: "warning",
+  info: "info",
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -67,11 +68,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             className={cn(
-              "pointer-events-auto flex w-full max-w-sm items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium shadow-lg",
+              "pointer-events-auto flex w-full max-w-sm items-center gap-2 rounded-control px-4 py-3 text-sm font-medium shadow-overlay",
               toneStyles[t.tone],
             )}
           >
-            <span className="font-bold">{toneIcon[t.tone]}</span>
+            <Icon name={toneIcon[t.tone]} className="h-4 w-4" />
             {t.message}
           </div>
         ))}

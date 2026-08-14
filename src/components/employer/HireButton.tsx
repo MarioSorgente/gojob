@@ -3,7 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { markHiredAction } from "@/app/employer/actions";
-import { Button } from "@/components/ui";
+import { Button, Spinner } from "@/components/ui";
+import { Icon } from "@/components/Icon";
+import { useT } from "@/lib/i18n/client";
 
 export function HireButton({
   jobId,
@@ -15,6 +17,7 @@ export function HireButton({
   size?: "sm" | "md" | "lg";
 }) {
   const router = useRouter();
+  const t = useT();
   const [pending, start] = useTransition();
   const [done, setDone] = useState(false);
 
@@ -27,12 +30,18 @@ export function HireButton({
   }
 
   if (done) {
-    return <span className="text-sm font-semibold text-success">✓ Hired</span>;
+    return (
+      <span className="inline-flex items-center gap-1 text-sm font-semibold text-success">
+        <Icon name="check" className="h-4 w-4" />
+        {t("employer.hire")}
+      </span>
+    );
   }
 
   return (
     <Button size={size} variant="accent" onClick={hire} disabled={pending}>
-      {pending ? "…" : "Mark as Hired"}
+      {pending ? <Spinner /> : <Icon name="checkBadge" className="h-4 w-4" />}
+      {t("employer.hire")}
     </Button>
   );
 }

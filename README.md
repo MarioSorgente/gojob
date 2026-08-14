@@ -118,7 +118,7 @@ npm run build       # production build
 npm run lint        # eslint
 ```
 
-Current state: **21 unit tests passing, typecheck clean, 34 routes building.**
+Current state: **197 unit tests passing, typecheck and lint clean, 41 routes building.**
 See [docs/ROADMAP.md](docs/ROADMAP.md) for what testing is still missing (E2E,
 server actions, security rules).
 

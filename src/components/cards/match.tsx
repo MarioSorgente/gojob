@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { Icon } from "../Icon";
 
 export function matchTone(score: number): "green" | "brand" | "amber" {
   if (score >= 85) return "green";
@@ -7,9 +8,9 @@ export function matchTone(score: number): "green" | "brand" | "amber" {
 }
 
 const toneClasses = {
-  green: "bg-green-100 text-green-700",
+  green: "bg-success-soft text-success",
   brand: "bg-brand-soft text-brand-dark",
-  amber: "bg-amber-100 text-amber-700",
+  amber: "bg-warning-soft text-warning",
 } as const;
 
 export function MatchPercent({
@@ -44,8 +45,10 @@ export function ReasonList({
   return (
     <ul className="space-y-1">
       {shown.map((r, i) => (
-        <li key={i} className="flex items-center gap-1.5 text-sm text-slate-600">
-          <span className="text-success">{r.startsWith("✓") ? "" : "✓"}</span>
+        <li key={i} className="flex items-start gap-1.5 text-sm text-subtle">
+          <Icon name="check" className="mt-0.5 h-3.5 w-3.5 text-success" />
+          {/* Reasons are generated with a leading "✓" — strip it now that the
+              tick is a real icon, or every row shows two. */}
           {r.replace(/^✓\s*/, "")}
         </li>
       ))}

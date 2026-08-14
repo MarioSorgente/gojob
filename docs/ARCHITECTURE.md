@@ -140,7 +140,7 @@ never at module load.
 
 This isn't stylistic — eager init took production down twice:
 
-1. `/login` and `/register` are statically prerendered. They import the auth
+1. `/login` and `/register` were statically prerendered at the time. They import the auth
    client, so `getAuth()` ran **at build time**. With `NEXT_PUBLIC_FIREBASE_API_KEY`
    unset in Vercel it threw `auth/invalid-api-key` and failed the entire build.
 2. The Admin SDK parsed its service account at module load. A malformed
@@ -217,6 +217,58 @@ override is the actual fix. Webpack is kept only because Turbopack has a
 documented class of external-module failures (vercel/next.js#87737, #87686) and
 this deployment is known-good on webpack. It is a candidate for removal once
 production has been verified stable — try it deliberately, not incidentally.
+
+---
+
+## Why auth transitions are a full page load
+
+`AuthForm` and `LogoutButton` navigate with `window.location.assign()`, not
+`router.push`/`replace`. This is deliberate, and the Next lint rule that objects
+to it is suppressed at both sites with a comment.
+
+Signing in or out changes what **every** server component renders. A soft
+navigation leaves the pre-transition RSC payloads in the client Router Cache,
+and Next restores those on Back/Forward regardless of staleness. The symptom was
+a bug report: *"if I log in and go back in the page it logs out."* The session
+cookie was intact the whole time — the user was looking at a cached copy of the
+landing page rendered before they signed in, which still said "Log in".
+
+Three things together fix that class of bug:
+
+1. `/`, `/login` and `/register` call `getSessionUser()`, so they render per
+   request instead of being prerendered once for everybody. `/login` and
+   `/register` also redirect an already-authenticated visitor to `homePathFor()`
+   — the reverse of what middleware does.
+2. Auth transitions are a full load, which discards the Router Cache entirely.
+   It costs one page load on a once-per-session event.
+3. `middleware.ts` sends `Cache-Control: no-store` on its redirect, so the 307
+   itself cannot be replayed after the cookie exists. `BfcacheGuard` reloads on
+   `pageshow`/`persisted` for browsers that bfcache a `no-store` response.
+
+---
+
+## i18n: display layer only
+
+English and Bahasa Indonesia, in `src/lib/i18n/`. No dependency —
+`next-intl` would force a `/[locale]/…` restructure that collides with
+`middleware.ts`, and the app is overwhelmingly server components.
+
+- `en.ts` is the canonical key set; `id.ts` is typed as `Dictionary`, so a new
+  key fails the typecheck until it is translated. `i18n.test.ts` covers what a
+  type cannot: empty values, dropped `{placeholders}`, untranslated leftovers.
+- Server components call `await getT()`. Client components use `useT()`, and the
+  provider receives only the namespaces they need (`clientSlice`), so the RSC
+  payload carries a fraction of the dictionary.
+- Locale resolution: `gojob_lang` cookie → `users.language` → `Accept-Language`
+  → `en`. The cookie is what lets logged-out visitors on the landing and public
+  job pages pick a language.
+
+**Taxonomy values in `src/lib/taxonomy.ts` are never translated.** They are
+stored in Firestore, and they are match keys and query values — `role: "Barista"`,
+`employmentType: "Full-time"`. `i18n/taxonomy.ts` is a render-time lookup:
+`<option value>` keeps the canonical English and only the visible text changes.
+Matching, `firestore.indexes.json` and every repo query are untouched by
+language. Area names are proper nouns and pass through unchanged.
 
 ---
 

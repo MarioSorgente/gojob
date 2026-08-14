@@ -4,13 +4,18 @@ import { requireRole } from "@/lib/auth";
 import { getBusinessByOwner } from "@/lib/repos/businesses";
 import { listJobsByBusiness } from "@/lib/repos/jobs";
 import { getShortlistCounts } from "@/lib/repos/pipeline";
-import { Badge, ButtonLink, Card, EmptyState } from "@/components/ui";
+import { formatRelativeTime } from "@/lib/format";
+import { getI18n } from "@/lib/i18n/server";
+import { areaLabel, employmentTypeLabel, roleLabel } from "@/lib/i18n/taxonomy";
+import { Badge, ButtonLink, Card, EmptyState, PageTitle } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 
 export default async function EmployerDashboard() {
   const user = await requireRole("employer");
   const business = await getBusinessByOwner(user.uid);
   if (!business) redirect("/employer/onboarding");
 
+  const { locale, t } = await getI18n();
   const jobs = await listJobsByBusiness(business.id);
   const withStats = await Promise.all(
     jobs.map(async (job) => ({ job, ...(await getShortlistCounts(job.id)) })),
@@ -18,60 +23,93 @@ export default async function EmployerDashboard() {
 
   return (
     <>
-      <div className="mb-4">
-        <h1 className="text-xl font-bold tracking-tight">{business.name}</h1>
-        <p className="mt-0.5 text-sm text-muted">
-          {business.verificationStatus === "verified"
-            ? "✓ Verified business"
-            : "Unverified business"}{" "}
-          · 📍 {business.area}
-        </p>
-      </div>
+      <PageTitle
+        title={business.name}
+        subtitle={`${
+          business.verificationStatus === "verified"
+            ? t("common.verified")
+            : t("common.unverified")
+        } · ${areaLabel(business.area, locale)}`}
+        action={
+          <ButtonLink href="/employer/jobs/new">
+            <Icon name="plus" className="h-4 w-4" />
+            {t("employer.postJob")}
+          </ButtonLink>
+        }
+      />
 
-      <ButtonLink href="/employer/jobs/new" size="lg" className="w-full md:w-auto">
-        + Post a Job
-      </ButtonLink>
+      {withStats.length === 0 ? (
+        <EmptyState
+          icon="briefcase"
+          title={t("employer.noJobs")}
+          hint={t("employer.noJobsHint")}
+          action={
+            <ButtonLink href="/employer/jobs/new">
+              <Icon name="plus" className="h-4 w-4" />
+              {t("employer.postJob")}
+            </ButtonLink>
+          }
+        />
+      ) : (
+        <ul className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+          {withStats.map(({ job, total, applied, matched }) => (
+            <li key={job.id}>
+              <Link
+                href={`/employer/jobs/${job.id}`}
+                className="block h-full rounded-card outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2"
+              >
+                <Card className="h-full p-4 transition-[border-color,box-shadow] hover:border-brand/40 hover:shadow-raised">
+                  <div className="flex items-start justify-between gap-2">
+                    <h2 className="font-bold leading-tight">
+                      {roleLabel(job.role, locale)}
+                    </h2>
+                    <Badge tone={job.status === "live" ? "green" : "slate"}>
+                      {job.status}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+                    <span className="inline-flex items-center gap-1">
+                      <Icon name="mapPin" className="h-4 w-4" />
+                      {areaLabel(job.area, locale)}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Icon name="clock" className="h-4 w-4" />
+                      {employmentTypeLabel(job.employmentType, locale)}
+                    </span>
+                  </p>
 
-      <div className="mt-5 space-y-3 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-3">
-        {withStats.length === 0 ? (
-          <EmptyState
-            icon="📋"
-            title="No jobs yet"
-            hint="Post your first job to see matching candidates instantly."
-          />
-        ) : (
-          withStats.map(({ job, total, applied, matched }) => (
-            <Link
-              key={job.id}
-              href={`/employer/jobs/${job.id}`}
-              className="block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2"
-            >
-              <Card className="h-full p-4 transition-colors hover:border-brand/40">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-bold leading-tight">{job.role}</h3>
-                  <Badge tone={job.status === "live" ? "green" : "slate"}>
-                    {job.status}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted">
-                  📍 {job.area} · {job.employmentType}
-                </p>
-                <div className="mt-2 flex gap-4 text-sm">
-                  <span>
-                    <b className="text-brand">{total}</b> candidates
-                  </span>
-                  <span>
-                    <b className="text-brand">{applied}</b> applied
-                  </span>
-                  <span>
-                    <b className="text-brand">{matched}</b> matched
-                  </span>
-                </div>
-              </Card>
-            </Link>
-          ))
-        )}
-      </div>
+                  <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-border/70 pt-3 text-sm">
+                    <div>
+                      <dd className="text-lg font-bold tabular-nums text-brand">
+                        {total}
+                      </dd>
+                      <dt className="text-xs text-muted">{t("employer.recommended")}</dt>
+                    </div>
+                    <div>
+                      <dd className="text-lg font-bold tabular-nums text-brand">
+                        {applied}
+                      </dd>
+                      <dt className="text-xs text-muted">{t("employer.applicants")}</dt>
+                    </div>
+                    <div>
+                      <dd className="text-lg font-bold tabular-nums text-brand">
+                        {matched}
+                      </dd>
+                      <dt className="text-xs text-muted">{t("chat.title")}</dt>
+                    </div>
+                  </dl>
+
+                  <p className="mt-3 text-xs text-muted">
+                    {t("job.postedAgo", {
+                      time: formatRelativeTime(job.createdAt, locale),
+                    })}
+                  </p>
+                </Card>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   );
 }

@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createHash } from "node:crypto";
 import { FieldPath } from "firebase-admin/firestore";
 import { adminDb } from "../firebase/admin";
@@ -14,6 +15,7 @@ import {
   type Page,
 } from "../pagination";
 import type {
+  CandidateAction,
   Conversation,
   EmployerAction,
   Job,
@@ -178,7 +180,9 @@ async function hydrateWithJobs(
  * back to reading the row directly out of each job, which needs no index at all
  * because it addresses documents by path.
  */
-export async function candidateEntries(
+export const candidateEntries = cache(uncachedCandidateEntries);
+
+async function uncachedCandidateEntries(
   candidateId: string,
 ): Promise<JobCandidate[]> {
   return withIndexFallback(
@@ -203,6 +207,24 @@ export async function candidateEntries(
       return docs.filter((d) => d.exists).map((d) => d.data() as JobCandidate);
     },
   );
+}
+
+/**
+ * jobId → what this candidate has already done with it.
+ *
+ * Lets a result list mark applied and passed jobs instead of re-offering the
+ * same dead ends. Free in practice: `candidateEntries` is request-cached and
+ * the app shell has already called it for the invitations badge.
+ */
+export async function listCandidateActions(
+  candidateId: string,
+): Promise<Record<string, CandidateAction>> {
+  const entries = await candidateEntries(candidateId);
+  const out: Record<string, CandidateAction> = {};
+  for (const entry of entries) {
+    if (entry.candidateAction !== "none") out[entry.jobId] = entry.candidateAction;
+  }
+  return out;
 }
 
 /** Invitations awaiting the candidate's response. */

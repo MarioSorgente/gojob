@@ -4,6 +4,8 @@ import { requireRole } from "@/lib/auth";
 import { listCandidateInvitations } from "@/lib/repos/pipeline";
 import { countUnreadForUser } from "@/lib/repos/chat";
 import { AppShell } from "@/components/AppShell";
+import type { NavItem } from "@/components/navigation";
+import { getT } from "@/lib/i18n/server";
 
 export default async function CandidateAppLayout({
   children,
@@ -27,19 +29,26 @@ export default async function CandidateAppLayout({
     }),
   ]);
 
-  const items = [
-    { href: "/candidate", label: "For you", icon: "🧭" },
-    { href: "/candidate/search", label: "Search", icon: "🔍" },
+  const t = await getT();
+
+  const items: NavItem[] = [
+    { href: "/candidate", label: t("nav.forYou"), icon: "compass" },
+    { href: "/candidate/search", label: t("nav.search"), icon: "search" },
     {
       href: "/candidate/invitations",
-      label: "Invites",
-      icon: "✨",
+      label: t("nav.invites"),
+      icon: "sparkle",
       badge: invites.length || undefined,
     },
     // The employer side has always shown an unread count here; the candidate
     // side didn't, so a new message was invisible until they opened Chats.
-    { href: "/candidate/matches", label: "Chats", icon: "💬", badge: unread || undefined },
-    { href: "/candidate/profile", label: "Profile", icon: "🙂" },
+    {
+      href: "/candidate/matches",
+      label: t("nav.chats"),
+      icon: "chat",
+      badge: unread || undefined,
+    },
+    { href: "/candidate/profile", label: t("nav.profile"), icon: "user" },
   ];
 
   return <AppShell items={items}>{children}</AppShell>;

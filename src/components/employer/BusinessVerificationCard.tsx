@@ -10,6 +10,7 @@ import { ImageUpload } from "@/components/ImageUpload";
 import { Badge, Button, Card } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import type { VerificationStatus } from "@/lib/types";
+import { Icon } from "@/components/Icon";
 
 export function BusinessVerificationCard({
   uid,
@@ -47,7 +48,12 @@ export function BusinessVerificationCard({
       <Card className="p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-bold">Verification</h2>
-          {status === "verified" && <Badge tone="green">✓ Verified</Badge>}
+          {status === "verified" && (
+      <Badge tone="green">
+        <Icon name="checkBadge" className="h-3.5 w-3.5" />
+        Verified
+      </Badge>
+    )}
           {status === "pending" && <Badge tone="amber">Pending review</Badge>}
           {status === "rejected" && <Badge tone="red">Rejected</Badge>}
           {status === "not_submitted" && <Badge tone="slate">Unverified</Badge>}

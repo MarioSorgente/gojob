@@ -14,18 +14,16 @@ import {
 } from "@/lib/taxonomy";
 import { suggestedSkillsForRoles } from "@/lib/skills";
 import type { JobInput } from "@/lib/forms";
-import { Button, Chip, Field, Input, Select, Textarea } from "@/components/ui";
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-border bg-surface p-4">
-      <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted">
-        {title}
-      </h2>
-      <div className="space-y-3">{children}</div>
-    </section>
-  );
-}
+import {
+  Button,
+  Chip,
+  Field,
+  Input,
+  SectionCard,
+  Select,
+  Textarea,
+} from "@/components/ui";
+import { Icon } from "@/components/Icon";
 
 const toNum = (v: string): number | null => {
   const n = Number(v.replace(/[^0-9]/g, ""));
@@ -85,7 +83,7 @@ export function JobForm({ businessArea }: { businessArea: string }) {
 
   return (
     <form onSubmit={submit} className="space-y-4 pb-24">
-      <Section title="Role">
+      <SectionCard title="Role">
         <Select value={role} onChange={(e) => setRole(e.target.value)}>
           {ROLES.map((r) => (
             <option key={r}>{r}</option>
@@ -98,9 +96,9 @@ export function JobForm({ businessArea }: { businessArea: string }) {
             placeholder="Enter the role"
           />
         )}
-      </Section>
+      </SectionCard>
 
-      <Section title="Location & type">
+      <SectionCard title="Location & type">
         <Field label="Area">
           <Select value={area} onChange={(e) => setArea(e.target.value)}>
             {AREAS.map((a) => (
@@ -118,9 +116,9 @@ export function JobForm({ businessArea }: { businessArea: string }) {
             ))}
           </Select>
         </Field>
-      </Section>
+      </SectionCard>
 
-      <Section title="Salary">
+      <SectionCard title="Salary">
         <Select
           value={salaryType}
           onChange={(e) => setSalaryType(e.target.value as SalaryType)}
@@ -147,9 +145,9 @@ export function JobForm({ businessArea }: { businessArea: string }) {
             />
           </Field>
         </div>
-      </Section>
+      </SectionCard>
 
-      <Section title="Experience">
+      <SectionCard title="Experience">
         <Field label="Minimum years">
           <Input
             inputMode="numeric"
@@ -158,9 +156,9 @@ export function JobForm({ businessArea }: { businessArea: string }) {
             placeholder="2"
           />
         </Field>
-      </Section>
+      </SectionCard>
 
-      <Section title="Must-have skills">
+      <SectionCard title="Must-have skills">
         <div className="flex flex-wrap gap-2">
           {skillPool.map((s) => (
             <Chip key={s} active={required.includes(s)} onClick={() => toggle(required, setRequired, s)}>
@@ -186,9 +184,9 @@ export function JobForm({ businessArea }: { businessArea: string }) {
             Add
           </Button>
         </div>
-      </Section>
+      </SectionCard>
 
-      <Section title="Nice-to-have skills">
+      <SectionCard title="Nice-to-have skills">
         <div className="flex flex-wrap gap-2">
           {skillPool
             .filter((s) => !required.includes(s))
@@ -202,9 +200,9 @@ export function JobForm({ businessArea }: { businessArea: string }) {
               </Chip>
             ))}
         </div>
-      </Section>
+      </SectionCard>
 
-      <Section title="Languages">
+      <SectionCard title="Languages">
         {languages.map((l, i) => (
           <div key={i} className="flex gap-2">
             <Select
@@ -235,8 +233,9 @@ export function JobForm({ businessArea }: { businessArea: string }) {
               type="button"
               variant="subtle"
               onClick={() => setLanguages(languages.filter((_, j) => j !== i))}
+              aria-label="Remove language"
             >
-              ✕
+              <Icon name="close" className="h-4 w-4" />
             </Button>
           </div>
         ))}
@@ -250,9 +249,9 @@ export function JobForm({ businessArea }: { businessArea: string }) {
         >
           + Add language
         </Button>
-      </Section>
+      </SectionCard>
 
-      <Section title="When & details">
+      <SectionCard title="When & details">
         <Field label="Desired start date">
           <Input
             type="date"
@@ -267,7 +266,7 @@ export function JobForm({ businessArea }: { businessArea: string }) {
             placeholder="Describe the role, shifts, what you're looking for…"
           />
         </Field>
-      </Section>
+      </SectionCard>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-border bg-surface/95 p-4 backdrop-blur">
         <div className="mx-auto max-w-md">

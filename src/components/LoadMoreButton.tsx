@@ -1,6 +1,7 @@
 "use client";
 
-import { Button } from "@/components/ui";
+import { Alert, Button, Spinner } from "@/components/ui";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * Shared footer for paged lists. Renders nothing once the list is exhausted,
@@ -9,22 +10,32 @@ import { Button } from "@/components/ui";
 export function LoadMoreButton({
   hasMore,
   loading,
-  error,
+  failed,
   onClick,
 }: {
   hasMore: boolean;
   loading: boolean;
-  error?: string | null;
+  failed?: boolean;
   onClick: () => void;
 }) {
-  if (!hasMore && !error) return null;
+  const t = useT();
+  if (!hasMore && !failed) return null;
 
   return (
     <div className="pt-2 text-center">
-      {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+      {failed && (
+        <Alert tone="danger" className="mb-3 text-left">
+          {t("common.somethingWentWrong")}
+        </Alert>
+      )}
       {hasMore && (
         <Button variant="outline" onClick={onClick} disabled={loading}>
-          {loading ? "Loading…" : error ? "Try again" : "Load more"}
+          {loading ? <Spinner /> : null}
+          {loading
+            ? t("common.loading")
+            : failed
+              ? t("common.retry")
+              : t("common.loadMore")}
         </Button>
       )}
     </div>

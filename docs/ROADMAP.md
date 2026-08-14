@@ -61,7 +61,7 @@ in the photo, ID-document and logo actions. Covers cross-user paths, wrong
 scope, uid prefix collisions, traversal, and off-site URLs.
 
 ### 6. Tests above the unit level ✅🟡
-**Done:** 92 tests. `pipeline.ts` and `rematch.ts` now have integration coverage
+**Done:** 197 tests. `pipeline.ts` and `rematch.ts` now have integration coverage
 against an in-memory Firestore double (`src/lib/repos/testing/fakeFirestore.ts`)
 — the full apply/invite/match/hire state machine, including idempotency and the
 two Apply/Pass regressions.
@@ -91,8 +91,8 @@ Things that work but are shallower than they look.
 | **Job editing** | Jobs can be created and closed but not edited after publishing. |
 | **Candidate deletion** | No account deletion or data export — a GDPR/PDP concern before launch. |
 | **Saved candidates** | "Save" is recorded on the shortlist row but there's no cross-job saved list. |
-| **i18n** | English only. `user.language` exists in the model but nothing reads it. Bahasa Indonesia matters for the candidate side. |
-| **Accessibility** | Not audited. The swipe deck is pointer-driven with button fallbacks, but focus management and screen-reader labelling need a pass. |
+| **i18n** | ✅ English + Bahasa Indonesia (`src/lib/i18n/`). `users.language` is read by `getLocale()`, and a `gojob_lang` cookie covers logged-out visitors. Admin is English-only by design. |
+| **Accessibility** | 🟡 One pass done: SVG icon set replacing emoji, real tab/dialog patterns, labelled inputs, 4.5:1 contrast, skip link, `aria-live` on chat and the swipe deck. Not independently audited, and there are still no automated a11y checks. |
 | **Analytics** | No event tracking, so funnel drop-off is invisible. |
 
 ---

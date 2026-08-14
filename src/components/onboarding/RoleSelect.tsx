@@ -2,28 +2,31 @@
 
 import { useState, useTransition } from "react";
 import { setRoleAction } from "@/app/onboarding/actions";
-import { interactive } from "@/components/ui";
+import { Spinner, interactive } from "@/components/ui";
+import { Icon, type IconName } from "@/components/Icon";
+import { useT } from "@/lib/i18n/client";
+import type { DictionaryKey } from "@/lib/i18n/dictionary";
 import { cn } from "@/lib/cn";
 
 type SelfServiceUserRole = "candidate" | "employer";
 
 const OPTIONS: {
   role: SelfServiceUserRole;
-  icon: string;
-  title: string;
-  text: string;
+  icon: IconName;
+  title: DictionaryKey;
+  text: DictionaryKey;
 }[] = [
   {
     role: "employer",
-    icon: "🏝️",
-    title: "I'm hiring",
-    text: "A café, restaurant, bar, hotel or beach club looking for staff.",
+    icon: "building",
+    title: "landing.ctaEmployer",
+    text: "employer.jobsSubtitle",
   },
   {
     role: "candidate",
-    icon: "🙋",
-    title: "I'm looking for work",
-    text: "Find hospitality jobs across Bali. Always free.",
+    icon: "user",
+    title: "landing.ctaCandidate",
+    text: "filter.searchJobsSubtitle",
   },
 ];
 
@@ -34,6 +37,7 @@ export function RoleSelect({
   preselect?: string;
   next?: string;
 }) {
+  const t = useT();
   const [selected, setSelected] = useState<SelfServiceUserRole | null>(
     preselect === "employer" || preselect === "candidate" ? preselect : null,
   );
@@ -52,26 +56,28 @@ export function RoleSelect({
           type="button"
           onClick={() => choose(o.role)}
           disabled={pending}
+          aria-pressed={selected === o.role}
           className={cn(
-            "flex w-full items-start gap-4 rounded-2xl border-2 bg-surface p-5 text-left",
+            "flex w-full items-start gap-4 rounded-card border-2 bg-surface p-5 text-left",
             interactive,
             selected === o.role
               ? "border-brand ring-2 ring-brand/20"
               : "border-border hover:border-brand/40",
           )}
         >
-          <span aria-hidden="true" className="text-3xl">
-            {o.icon}
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-brand-soft text-brand-dark">
+            <Icon name={o.icon} className="h-6 w-6" />
           </span>
           <span>
-            <span className="block text-lg font-bold">{o.title}</span>
-            <span className="block text-sm text-muted">{o.text}</span>
+            <span className="block text-lg font-bold">{t(o.title)}</span>
+            <span className="block text-sm text-muted">{t(o.text)}</span>
           </span>
         </button>
       ))}
       {pending && (
-        <p className="text-center text-sm text-muted">
-          Setting up your account…
+        <p className="flex items-center justify-center gap-2 text-center text-sm text-muted">
+          <Spinner />
+          {t("common.pleaseWait")}
         </p>
       )}
     </div>

@@ -7,6 +7,7 @@ import type {
   TextareaHTMLAttributes,
 } from "react";
 import { cn } from "@/lib/cn";
+import { Icon, type IconName } from "./Icon";
 
 // ---------------------------------------------------------------------------
 // Button
@@ -16,12 +17,13 @@ type ButtonVariant = "primary" | "accent" | "outline" | "ghost" | "danger" | "su
 type ButtonSize = "sm" | "md" | "lg";
 
 const buttonVariants: Record<ButtonVariant, string> = {
-  primary: "bg-brand text-white hover:bg-brand-dark shadow-sm",
-  accent: "bg-accent text-white hover:brightness-95 shadow-sm",
-  outline: "border border-border bg-surface text-foreground hover:bg-slate-50",
+  primary: "bg-brand text-white hover:bg-brand-dark shadow-card",
+  accent: "bg-accent text-white hover:brightness-95 shadow-card",
+  outline:
+    "border border-border bg-surface text-foreground hover:bg-surface-muted hover:border-border-strong",
   ghost: "text-brand hover:bg-brand-soft/60",
-  danger: "border border-red-200 bg-white text-red-600 hover:bg-red-50",
-  subtle: "bg-slate-100 text-slate-700 hover:bg-slate-200",
+  danger: "border border-danger/25 bg-surface text-danger hover:bg-danger-soft",
+  subtle: "bg-surface-muted text-subtle hover:bg-border",
 };
 
 const buttonSizes: Record<ButtonSize, string> = {
@@ -60,7 +62,7 @@ export function Button({
       // Button inside a form submit it accidentally.
       type={type}
       className={cn(
-        "inline-flex select-none items-center justify-center gap-2 rounded-xl font-semibold",
+        "inline-flex select-none items-center justify-center gap-2 rounded-control font-semibold",
         interactive,
         buttonVariants[variant],
         buttonSizes[size],
@@ -90,10 +92,26 @@ export function ButtonLink({
   return (
     <a
       className={cn(
-        "inline-flex select-none items-center justify-center gap-2 rounded-xl font-semibold no-underline",
+        "inline-flex select-none items-center justify-center gap-2 rounded-control font-semibold no-underline",
         interactive,
         buttonVariants[variant],
         buttonSizes[size],
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+/** An inline text link. Replaces the same class string copy-pasted at 4 sites. */
+export function TextLink({
+  className,
+  ...props
+}: AnchorHTMLAttributes<HTMLAnchorElement>) {
+  return (
+    <a
+      className={cn(
+        "rounded font-semibold text-brand outline-none hover:text-brand-dark focus-visible:ring-2 focus-visible:ring-brand/40",
         className,
       )}
       {...props}
@@ -129,11 +147,179 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border bg-surface shadow-sm",
+        "rounded-card border border-border bg-surface shadow-card",
         className,
       )}
     >
       {children}
+    </div>
+  );
+}
+
+/**
+ * A titled card for long forms. Two byte-identical copies of this had drifted
+ * into OnboardingForm and JobForm.
+ */
+export function SectionCard({
+  title,
+  hint,
+  className,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className={cn(
+        "rounded-card border border-border bg-surface p-4 shadow-card sm:p-5",
+        className,
+      )}
+    >
+      <h2 className="type-heading">{title}</h2>
+      {hint ? <p className="mt-0.5 text-sm text-muted">{hint}</p> : null}
+      <div className="mt-3 space-y-3">{children}</div>
+    </section>
+  );
+}
+
+/**
+ * The bar that pins a form's primary action to the bottom of the viewport.
+ * The same class string appeared verbatim in three forms.
+ */
+export function StickyActionBar({
+  className,
+  children,
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "sticky bottom-0 -mx-5 mt-4 border-t border-border bg-surface/95 px-5 py-3 backdrop-blur",
+        "pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Alert
+// ---------------------------------------------------------------------------
+
+type AlertTone = "info" | "success" | "warning" | "danger";
+
+const alertTones: Record<AlertTone, string> = {
+  info: "border-info/20 bg-info-soft text-info",
+  success: "border-success/20 bg-success-soft text-success",
+  warning: "border-warning/20 bg-warning-soft text-warning",
+  danger: "border-danger/20 bg-danger-soft text-danger",
+};
+
+const alertIcons: Record<AlertTone, IconName> = {
+  info: "info",
+  success: "check",
+  warning: "warning",
+  danger: "error",
+};
+
+/**
+ * Inline feedback. Replaces eight hand-rolled `bg-red-50 text-red-600` blocks
+ * that had each picked their own padding, radius and shade.
+ *
+ * `danger` and `warning` announce themselves — an error a screen reader never
+ * hears is an error the user never fixes.
+ */
+export function Alert({
+  tone = "info",
+  title,
+  className,
+  children,
+}: {
+  tone?: AlertTone;
+  title?: string;
+  className?: string;
+  children?: ReactNode;
+}) {
+  const assertive = tone === "danger" || tone === "warning";
+  return (
+    <div
+      role={assertive ? "alert" : "status"}
+      aria-live={assertive ? "assertive" : "polite"}
+      className={cn(
+        "flex items-start gap-2.5 rounded-control border px-3.5 py-3 text-sm",
+        alertTones[tone],
+        className,
+      )}
+    >
+      <Icon name={alertIcons[tone]} className="mt-0.5 h-4 w-4" />
+      <div className="min-w-0 flex-1">
+        {title ? <p className="font-semibold">{title}</p> : null}
+        {children ? <div className={cn(title && "mt-0.5")}>{children}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Progress
+// ---------------------------------------------------------------------------
+
+/** A 0–100 meter. Was drawn inline in ProfileStrengthCard and MatchExplain. */
+export function Progress({
+  value,
+  label,
+  tone = "brand",
+  className,
+}: {
+  value: number;
+  /** Required unless the surrounding text already names the meter. */
+  label?: string;
+  tone?: "brand" | "success" | "warning";
+  className?: string;
+}) {
+  const pct = Math.max(0, Math.min(100, Math.round(value)));
+  const fill =
+    tone === "success" ? "bg-success" : tone === "warning" ? "bg-warning" : "bg-brand";
+  return (
+    <div
+      role="progressbar"
+      aria-valuenow={pct}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={label}
+      className={cn("h-2 w-full overflow-hidden rounded-full bg-surface-muted", className)}
+    >
+      <div
+        className={cn("h-full rounded-full transition-[width] duration-300", fill)}
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Detail rows
+// ---------------------------------------------------------------------------
+
+/** A label/value row inside a `<dl>`. Was duplicated in both job detail pages. */
+export function DetailRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex justify-between gap-4 border-b border-border/70 py-2 last:border-0">
+      <dt className="shrink-0 text-muted">{label}</dt>
+      <dd className="text-right font-medium">{children}</dd>
     </div>
   );
 }
@@ -146,10 +332,10 @@ type BadgeTone = "brand" | "green" | "amber" | "slate" | "red";
 
 const badgeTones: Record<BadgeTone, string> = {
   brand: "bg-brand-soft text-brand-dark",
-  green: "bg-green-100 text-green-700",
-  amber: "bg-amber-100 text-amber-700",
-  slate: "bg-slate-100 text-slate-600",
-  red: "bg-red-100 text-red-700",
+  green: "bg-success-soft text-success",
+  amber: "bg-warning-soft text-warning",
+  slate: "bg-surface-muted text-subtle",
+  red: "bg-danger-soft text-danger",
 };
 
 export function Badge({
@@ -187,11 +373,11 @@ export function Chip({
       // touch target these previously missed at ~34px.
       aria-pressed={active}
       className={cn(
-        "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium",
+        "inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 text-sm font-medium",
         interactive,
         active
           ? "border-brand bg-brand text-white"
-          : "border-border bg-surface text-slate-600 hover:border-brand/50 hover:bg-slate-50",
+          : "border-border bg-surface text-subtle hover:border-brand/50 hover:bg-surface-muted",
         className,
       )}
       {...props}
@@ -261,7 +447,7 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+      <span className="mb-1.5 block text-sm font-semibold text-subtle">
         {label}
       </span>
       {children}
@@ -271,7 +457,35 @@ export function Field({
 }
 
 const inputBase =
-  "w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 placeholder:text-slate-400";
+  "w-full rounded-control border border-border bg-surface px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 placeholder:text-muted/70";
+
+/**
+ * A labelled checkbox with a 44px touch target.
+ *
+ * Raw `<input type="checkbox">` was used at three sites, each with its own
+ * spacing and none with a target big enough to hit on a phone.
+ */
+export function Checkbox({
+  label,
+  className,
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { label: ReactNode }) {
+  return (
+    <label
+      className={cn(
+        "flex min-h-11 cursor-pointer select-none items-center gap-2.5 text-sm",
+        className,
+      )}
+    >
+      <input
+        type="checkbox"
+        className="h-4.5 w-4.5 shrink-0 cursor-pointer rounded accent-brand outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2"
+        {...props}
+      />
+      {label}
+    </label>
+  );
+}
 
 export function Input({
   className,
@@ -304,20 +518,10 @@ export function Select({
       >
         {children}
       </select>
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 20 20"
-        fill="none"
-        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-      >
-        <path
-          d="M6 8l4 4 4-4"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <Icon
+        name="chevronDown"
+        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+      />
     </div>
   );
 }
@@ -326,18 +530,54 @@ export function Select({
 // Misc
 // ---------------------------------------------------------------------------
 
+/**
+ * The only way to render an h1 inside the app shell. Before this the same
+ * heading rendered at three different sizes depending on the page.
+ */
 export function PageTitle({
   title,
   subtitle,
+  action,
 }: {
   title: string;
   subtitle?: string;
+  /** Optional control aligned opposite the title (e.g. "Post a job"). */
+  action?: ReactNode;
 }) {
   return (
-    <div className="mb-4">
-      <h1 className="text-xl font-bold tracking-tight">{title}</h1>
-      {subtitle ? <p className="mt-0.5 text-sm text-muted">{subtitle}</p> : null}
+    <div className="mb-5 flex items-start justify-between gap-4">
+      <div className="min-w-0">
+        <h1 className="type-title">{title}</h1>
+        {subtitle ? <p className="mt-1 text-sm text-muted">{subtitle}</p> : null}
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
+  );
+}
+
+/** `← Back to X`. Was hand-written at four sites with four different glyphs. */
+export function BackLink({
+  href,
+  children,
+  className,
+}: {
+  href: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <a
+      href={href}
+      className={cn(
+        "-ml-2 inline-flex min-h-11 items-center gap-1.5 rounded-control px-2 text-sm font-medium text-muted",
+        "hover:text-foreground",
+        interactive,
+        className,
+      )}
+    >
+      <Icon name="arrowLeft" className="h-4 w-4" />
+      {children}
+    </a>
   );
 }
 
@@ -360,9 +600,7 @@ export function Section({
   return (
     <section className={className}>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-muted">
-          {title}
-        </h2>
+        <h2 className="type-eyebrow">{title}</h2>
         {action}
       </div>
       {children}
@@ -371,24 +609,26 @@ export function Section({
 }
 
 export function EmptyState({
-  icon = "🌴",
+  icon = "compass",
   title,
   hint,
   action,
 }: {
-  icon?: string;
+  icon?: IconName;
   title: string;
   hint?: string;
-  /** Optional CTA — an empty state that offers a next step beats a dead end. */
+  /** A next step. An empty state without one is a dead end. */
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-surface/60 px-6 py-10 text-center">
-      <div aria-hidden="true" className="text-3xl">
-        {icon}
-      </div>
-      <p className="mt-2 font-semibold text-slate-700">{title}</p>
-      {hint ? <p className="mt-1 text-sm text-muted">{hint}</p> : null}
+    <div className="rounded-card border border-dashed border-border-strong bg-surface/60 px-6 py-10 text-center">
+      <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-surface-muted text-muted">
+        <Icon name={icon} className="h-6 w-6" />
+      </span>
+      <p className="mt-3 font-semibold">{title}</p>
+      {hint ? (
+        <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-muted">{hint}</p>
+      ) : null}
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>
   );

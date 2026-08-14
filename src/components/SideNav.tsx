@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "./brand";
 import { cn } from "@/lib/cn";
+import { Icon } from "./Icon";
 import { activeNavHref, type NavItem } from "./navigation";
 
 /**
@@ -38,12 +39,10 @@ export function SideNav({ items, footer }: { items: NavItem[]; footer?: React.Re
                 "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/40",
                 isActive
                   ? "bg-brand-soft text-brand-dark"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-foreground",
+                  : "text-subtle hover:bg-surface-muted hover:text-foreground",
               )}
             >
-              <span aria-hidden="true" className="text-lg leading-none">
-                {item.icon}
-              </span>
+              <Icon name={item.icon} className="h-5 w-5" />
               <span className="flex-1">{item.label}</span>
               {item.badge ? (
                 <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">

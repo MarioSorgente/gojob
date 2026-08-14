@@ -1,33 +1,38 @@
 import type { StrengthResult } from "@/lib/profileStrength";
-import { Card } from "@/components/ui";
+import type { Translate } from "@/lib/i18n/dictionary";
+import { Card, Progress } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 
-export function ProfileStrengthCard({ strength }: { strength: StrengthResult }) {
+export function ProfileStrengthCard({
+  strength,
+  t,
+}: {
+  strength: StrengthResult;
+  t: Translate;
+}) {
   return (
     <Card className="p-5">
-      <div className="flex items-baseline justify-between">
-        <h2 className="font-bold">Profile Strength</h2>
-        <span className="text-2xl font-extrabold text-brand">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="type-heading">{t("candidate.profileStrength")}</h2>
+        <span className="text-2xl font-extrabold tabular-nums text-brand">
           {strength.percent}%
         </span>
       </div>
-      <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-        <div
-          className="h-full rounded-full bg-brand transition-all"
-          style={{ width: `${strength.percent}%` }}
-        />
-      </div>
-      <p className="mt-2 text-sm text-muted">
-        Improve your chances of being matched.
-      </p>
-      <ul className="mt-3 grid grid-cols-1 gap-1.5 text-sm">
+
+      <Progress
+        value={strength.percent}
+        label={t("candidate.profileStrength")}
+        className="mt-3"
+      />
+
+      <ul className="mt-4 grid grid-cols-1 gap-2 text-sm">
         {strength.items.map((i) => (
           <li key={i.key} className="flex items-center gap-2">
-            <span className={i.done ? "text-success" : "text-slate-300"}>
-              {i.done ? "✓" : "○"}
-            </span>
-            <span className={i.done ? "text-slate-700" : "text-muted"}>
-              {i.label}
-            </span>
+            <Icon
+              name={i.done ? "check" : "plus"}
+              className={`h-4 w-4 ${i.done ? "text-success" : "text-muted"}`}
+            />
+            <span className={i.done ? "text-subtle" : "text-muted"}>{i.label}</span>
           </li>
         ))}
       </ul>

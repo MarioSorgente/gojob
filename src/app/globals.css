@@ -1,16 +1,51 @@
 @import "tailwindcss";
 
+/**
+ * GoJob design tokens.
+ *
+ * Every colour, radius, shadow and type step the app is allowed to use lives
+ * here. Components should reach for `bg-surface` / `text-muted` / `rounded-card`
+ * rather than raw palette utilities — a semantic token can be retuned in one
+ * place, `bg-slate-100` cannot.
+ */
 :root {
-  --background: #f1f5f9; /* slate-100 */
+  /* Surfaces & text */
+  --background: #f8fafc; /* slate-50 — white cards need a near-white ground */
   --surface: #ffffff;
+  --surface-muted: #f1f5f9; /* slate-100 — inset rows, disabled fills */
   --foreground: #0f172a; /* slate-900 */
-  --muted: #64748b; /* slate-500 */
+  --muted: #64748b; /* slate-500 — the lightest text allowed on body copy */
+  --subtle: #475569; /* slate-600 — secondary labels */
   --border: #e2e8f0; /* slate-200 */
+  --border-strong: #cbd5e1; /* slate-300 */
+
+  /* Brand */
   --brand: #0d9488; /* teal-600 */
   --brand-dark: #0f766e; /* teal-700 */
   --brand-soft: #ccfbf1; /* teal-100 */
   --accent: #f97316; /* orange-500 */
-  --success: #16a34a; /* green-600 */
+
+  /* Status. Every soft/strong pair is AA on its partner at 14px bold. */
+  --success: #15803d; /* green-700 */
+  --success-soft: #dcfce7; /* green-100 */
+  --warning: #b45309; /* amber-700 */
+  --warning-soft: #fef3c7; /* amber-100 */
+  --danger: #b91c1c; /* red-700 */
+  --danger-soft: #fee2e2; /* red-100 */
+  --info: #1d4ed8; /* blue-700 */
+  --info-soft: #dbeafe; /* blue-100 */
+
+  /* Radii */
+  --radius-control: 0.75rem; /* buttons, inputs, chips */
+  --radius-card: 1rem; /* cards, panels */
+  --radius-panel: 1.5rem; /* sheets, hero surfaces */
+
+  /* Elevation */
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-raised: 0 4px 12px -2px rgb(15 23 42 / 0.1);
+  --shadow-overlay: 0 20px 40px -12px rgb(15 23 42 / 0.25);
+
+  /* Layout */
   --bottom-nav-base-height: 3.75rem;
   --bottom-nav-clearance: calc(
     var(--bottom-nav-base-height) + env(safe-area-inset-bottom, 0px)
@@ -20,14 +55,35 @@
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
   --color-brand: var(--brand);
   --color-brand-dark: var(--brand-dark);
   --color-brand-soft: var(--brand-soft);
   --color-accent: var(--accent);
+
   --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --radius-control: var(--radius-control);
+  --radius-card: var(--radius-card);
+  --radius-panel: var(--radius-panel);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
+
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji",
@@ -44,6 +100,48 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/**
+ * Typography scale. One h1 size, one h2 size, one h3 size — before this the app
+ * rendered h1 at three different sizes depending on which page you were on.
+ * Pages opt in via these classes instead of choosing `text-*` per site.
+ */
+.type-display {
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.type-title {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.type-heading {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 700;
+}
+.type-eyebrow {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+@media (min-width: 40rem) {
+  .type-display {
+    font-size: 2.25rem;
+    line-height: 2.5rem;
+  }
+  .type-title {
+    font-size: 1.5rem;
+    line-height: 2rem;
+  }
 }
 
 /* Hide scrollbars on the swipe deck without losing scroll. */
@@ -80,5 +178,31 @@ body {
     height: 100dvh;
     max-width: none;
     padding: 0;
+  }
+}
+
+/**
+ * Respect the OS motion preference. The app leans on `active:scale`,
+ * `animate-pulse`, `animate-spin` and smooth `scrollIntoView`; none of that
+ * should run for someone who has asked for reduced motion.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Spinners still need to read as "busy", just without the motion. */
+  .animate-spin {
+    animation: none !important;
+    opacity: 0.6;
   }
 }

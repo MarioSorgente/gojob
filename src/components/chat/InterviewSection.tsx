@@ -6,7 +6,10 @@ import {
   proposeInterviewAction,
   respondInterviewAction,
 } from "@/app/_actions/chat";
-import { Button, Card, Input } from "@/components/ui";
+import { Button, Card, Input, Spinner } from "@/components/ui";
+import { Icon } from "@/components/Icon";
+import { useI18n } from "@/lib/i18n/client";
+import { formatDate } from "@/lib/format";
 import type { Interview } from "@/lib/types";
 
 export function InterviewSection({
@@ -18,6 +21,7 @@ export function InterviewSection({
   uid: string;
   interviews: Interview[];
 }) {
+  const { locale, t } = useI18n();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState("");
@@ -48,9 +52,12 @@ export function InterviewSection({
     <div className="space-y-2">
       {interviews.map((iv) => (
         <Card key={iv.id} className="p-3">
-          <p className="text-sm font-semibold">📅 Interview</p>
+          <p className="flex items-center gap-1.5 text-sm font-semibold">
+            <Icon name="calendar" className="h-4 w-4 text-muted" />
+            {t("chat.interviews")}
+          </p>
           <p className="text-sm text-muted">
-            {iv.date} at {iv.time} · {iv.location}
+            {formatDate(iv.date, locale)} · {iv.time} · {iv.location}
           </p>
           {iv.status === "proposed" && iv.proposedBy !== uid && (
             <div className="mt-2 flex gap-2">
@@ -60,21 +67,24 @@ export function InterviewSection({
                 onClick={() => respond(iv.id, "declined")}
                 disabled={pending}
               >
-                Decline
+                {t("chat.decline")}
               </Button>
               <Button size="sm" onClick={() => respond(iv.id, "accepted")} disabled={pending}>
-                Accept
+                {t("chat.accept")}
               </Button>
             </div>
           )}
           {iv.status === "proposed" && iv.proposedBy === uid && (
-            <p className="mt-1 text-xs text-muted">Waiting for a response…</p>
+            <p className="mt-1 text-xs text-muted">{t("chat.interviewProposed")}</p>
           )}
           {iv.status === "accepted" && (
-            <p className="mt-1 text-xs font-semibold text-success">✓ Confirmed</p>
+            <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-success">
+              <Icon name="check" className="h-3.5 w-3.5" />
+              {t("chat.interviewAccepted")}
+            </p>
           )}
           {iv.status === "declined" && (
-            <p className="mt-1 text-xs text-red-500">Declined</p>
+            <p className="mt-1 text-xs text-danger">{t("chat.interviewDeclined")}</p>
           )}
         </Card>
       ))}
@@ -83,21 +93,35 @@ export function InterviewSection({
         <Card className="p-3">
           <form onSubmit={propose} className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-              <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} required />
+              <Input
+                type="date"
+                aria-label={t("chat.interviewDate")}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+              />
+              <Input
+                type="time"
+                aria-label={t("chat.interviewTime")}
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                required
+              />
             </div>
             <Input
-              placeholder="Location (café address or video call)"
+              aria-label={t("chat.interviewLocation")}
+              placeholder={t("chat.interviewLocation")}
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               required
             />
             <div className="flex gap-2">
               <Button type="button" variant="subtle" onClick={() => setOpen(false)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button type="submit" disabled={pending}>
-                {pending ? "…" : "Propose"}
+                {pending ? <Spinner /> : null}
+                {t("chat.proposeInterview")}
               </Button>
             </div>
           </form>
@@ -109,7 +133,8 @@ export function InterviewSection({
           className="w-full"
           onClick={() => setOpen(true)}
         >
-          📅 Schedule interview
+          <Icon name="calendar" className="h-4 w-4" />
+          {t("chat.proposeInterview")}
         </Button>
       )}
     </div>

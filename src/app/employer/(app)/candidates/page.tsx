@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth";
 import { getBusinessByOwner } from "@/lib/repos/businesses";
 import { searchCandidatesPage, toCandidateSummary } from "@/lib/repos/candidates";
@@ -12,21 +12,24 @@ import {
   PROFICIENCY_LEVELS,
   ROLES,
 } from "@/lib/taxonomy";
-import { PageTitle } from "@/components/ui";
-import { FilterBar, type FilterField } from "@/components/FilterBar";
+import { getI18n } from "@/lib/i18n/server";
+import {
+  areaLabel,
+  availabilityLabel,
+  employmentTypeLabel,
+  languageLabel,
+  options,
+  proficiencyLabel,
+  roleLabel,
+} from "@/lib/i18n/taxonomy";
+import { Alert, PageTitle, TextLink } from "@/components/ui";
+import { FilterBar, FilterRail, type FilterField } from "@/components/FilterBar";
 import { CandidateResults } from "@/components/employer/CandidateResults";
 
-const FIELDS: FilterField[] = [
-  { name: "role", label: "Role", type: "select", options: ROLES },
-  { name: "area", label: "Area", type: "select", options: AREAS },
-  { name: "minExp", label: "Minimum years of experience", type: "number", placeholder: "2" },
-  { name: "maxSalary", label: "Max monthly salary (IDR)", type: "number", placeholder: "8000000" },
-  { name: "availability", label: "Availability", type: "select", options: AVAILABILITY_TYPES },
-  { name: "employmentType", label: "Employment type", type: "select", options: EMPLOYMENT_TYPES },
-  { name: "language", label: "Language", type: "select", options: LANGUAGES },
-  { name: "level", label: "Minimum level", type: "select", options: PROFICIENCY_LEVELS },
-  { name: "verified", label: "ID-verified only", type: "checkbox" },
-];
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("employer.findCandidates") };
+}
 
 export default async function FindCandidatesPage({
   searchParams,
@@ -37,6 +40,7 @@ export default async function FindCandidatesPage({
   const business = await getBusinessByOwner(user.uid);
   if (!business) redirect("/employer/onboarding");
 
+  const { locale, t } = await getI18n();
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
   const num = (k: string) => {
@@ -63,34 +67,93 @@ export default async function FindCandidatesPage({
     .filter((j) => j.status === "live")
     .map((j) => ({ id: j.id, role: j.role }));
 
+  // Option `value` stays the canonical English stored in Firestore; only the
+  // visible `label` is translated.
+  const areaField: FilterField = {
+    name: "area",
+    label: t("filter.area"),
+    type: "select",
+    options: options(AREAS, locale, areaLabel),
+  };
+
+  const fields: FilterField[] = [
+    {
+      name: "role",
+      label: t("filter.role"),
+      type: "select",
+      options: options(ROLES, locale, roleLabel),
+    },
+    areaField,
+    { name: "minExp", label: t("candidate.experience"), type: "number", placeholder: "2" },
+    {
+      name: "maxSalary",
+      label: t("candidate.expectedSalary"),
+      type: "number",
+      placeholder: "8000000",
+    },
+    {
+      name: "availability",
+      label: t("candidate.availability"),
+      type: "select",
+      options: options(AVAILABILITY_TYPES, locale, availabilityLabel),
+    },
+    {
+      name: "employmentType",
+      label: t("filter.employmentType"),
+      type: "select",
+      options: options(EMPLOYMENT_TYPES, locale, employmentTypeLabel),
+    },
+    {
+      name: "language",
+      label: t("job.languages"),
+      type: "select",
+      options: options(LANGUAGES, locale, languageLabel),
+    },
+    {
+      name: "level",
+      label: t("candidate.verification"),
+      type: "select",
+      options: options(PROFICIENCY_LEVELS, locale, proficiencyLabel),
+    },
+    { name: "verified", label: t("common.verified"), type: "checkbox" },
+  ];
+
   return (
     <>
       <PageTitle
-        title="Find Candidates"
-        subtitle="Browse the whole talent pool — no job post required."
+        title={t("employer.findCandidates")}
+        subtitle={t("employer.findSubtitle")}
       />
-      <FilterBar fields={FIELDS} searchPlaceholder="Search name, skill, venue…" />
+
+      <FilterBar
+        fields={fields}
+        areaField={areaField}
+        searchPlaceholder={t("filter.keywordPlaceholder")}
+      />
 
       {jobs.length === 0 && (
-        <p className="mb-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Post a job first — invitations are always linked to a position.{" "}
-          <Link href="/employer/jobs/new" className="font-semibold underline">
-            Post a Job
-          </Link>
-        </p>
+        <Alert tone="warning" className="mb-4">
+          {t("employer.noJobsHint")}{" "}
+          <TextLink href="/employer/jobs/new">{t("employer.postJob")}</TextLink>
+        </Alert>
       )}
 
-      <CandidateResults
-        initialItems={firstPage.items.map((c) => ({
-          userId: c.userId,
-          firstName: c.firstName,
-          profileStrength: c.profileStrength,
-          summary: toCandidateSummary(c),
-        }))}
-        initialCursor={firstPage.nextCursor}
-        filters={filters}
-        jobs={jobs}
-      />
+      <div className="flex gap-6">
+        <FilterRail fields={fields} />
+        <div className="min-w-0 flex-1">
+          <CandidateResults
+            initialItems={firstPage.items.map((c) => ({
+              userId: c.userId,
+              firstName: c.firstName,
+              profileStrength: c.profileStrength,
+              summary: toCandidateSummary(c),
+            }))}
+            initialCursor={firstPage.nextCursor}
+            filters={filters}
+            jobs={jobs}
+          />
+        </div>
+      </div>
     </>
   );
 }

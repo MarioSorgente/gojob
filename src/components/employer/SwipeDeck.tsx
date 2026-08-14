@@ -6,8 +6,11 @@ import { employerActionOnCandidate } from "@/app/employer/actions";
 import type { CandidateSummary, EmployerAction, MatchBreakdown } from "@/lib/types";
 import { CandidateCard } from "@/components/cards/CandidateCard";
 import { MatchCelebration } from "@/components/MatchCelebration";
-import { Button, EmptyState } from "@/components/ui";
+import { Button, ButtonLink, EmptyState } from "@/components/ui";
+import { Icon } from "@/components/Icon";
 import { useToast } from "@/components/Toast";
+import { useT } from "@/lib/i18n/client";
+import type { Locale } from "@/lib/i18n/config";
 
 export interface DeckCandidate {
   candidateId: string;
@@ -21,11 +24,14 @@ export interface DeckCandidate {
 export function SwipeDeck({
   jobId,
   candidates,
+  locale,
 }: {
   jobId: string;
   candidates: DeckCandidate[];
+  locale: Locale;
 }) {
   const router = useRouter();
+  const t = useT();
   const { show } = useToast();
   const [index, setIndex] = useState(0);
   const [pending, start] = useTransition();
@@ -82,14 +88,19 @@ export function SwipeDeck({
     return (
       <>
         <EmptyState
-          icon="🎉"
-          title="You've reviewed everyone"
-          hint="Invited candidates appear in your pipeline below. Check Chats for matches."
+          icon="checkBadge"
+          title={t("employer.noCandidates")}
+          hint={t("employer.noCandidatesHint")}
+          action={
+            <ButtonLink href="/employer/candidates" variant="outline">
+              {t("employer.findCandidates")}
+            </ButtonLink>
+          }
         />
         <MatchCelebration
           open={!!matchHref}
           chatHref={matchHref ?? "#"}
-          subtitle={matchName ? `You and ${matchName} are connected.` : undefined}
+          subtitle={matchName || undefined}
           onClose={() => {
             setMatchHref(null);
             router.refresh();
@@ -103,8 +114,11 @@ export function SwipeDeck({
 
   return (
     <div>
-      <p className="mb-2 text-center text-xs text-muted">
-        {candidates.length - index} to review · swipe or tap
+      {/* The deck is pointer-driven, so its state has to be announced: a
+          keyboard or screen-reader user otherwise gets no feedback that the
+          card advanced. */}
+      <p className="mb-2 text-center text-xs text-muted" aria-live="polite">
+        {t("employer.shortlistCount", { count: candidates.length - index })}
       </p>
       <div
         className="touch-none select-none"
@@ -119,13 +133,19 @@ export function SwipeDeck({
       >
         <div className="relative">
           {drag > 40 && (
-            <span className="absolute left-4 top-4 z-10 rotate-[-12deg] rounded-lg border-2 border-success px-2 py-0.5 text-sm font-extrabold text-success">
-              INVITE
+            <span
+              aria-hidden="true"
+              className="absolute left-4 top-4 z-10 rotate-[-12deg] rounded-control border-2 border-success px-2 py-0.5 text-sm font-extrabold uppercase text-success"
+            >
+              {t("employer.invite")}
             </span>
           )}
           {drag < -40 && (
-            <span className="absolute right-4 top-4 z-10 rotate-[12deg] rounded-lg border-2 border-red-400 px-2 py-0.5 text-sm font-extrabold text-red-400">
-              PASS
+            <span
+              aria-hidden="true"
+              className="absolute right-4 top-4 z-10 rotate-[12deg] rounded-control border-2 border-danger px-2 py-0.5 text-sm font-extrabold uppercase text-danger"
+            >
+              {t("employer.pass")}
             </span>
           )}
           <CandidateCard
@@ -133,26 +153,33 @@ export function SwipeDeck({
             score={current.score}
             reasons={current.reasons}
             breakdown={current.breakdown}
+            locale={locale}
+            t={t}
           />
         </div>
       </div>
 
+      {/* Always-present buttons are the keyboard path through the deck — the
+          drag gesture is an accelerator, not the only way through. */}
       <div className="mt-4 grid grid-cols-3 gap-2">
         <Button variant="danger" size="lg" onClick={() => act("passed")} disabled={pending}>
-          Pass
+          <Icon name="close" className="h-4 w-4" />
+          {t("employer.pass")}
         </Button>
         <Button variant="subtle" size="lg" onClick={() => act("saved")} disabled={pending}>
-          Save
+          <Icon name="bookmark" className="h-4 w-4" />
+          {t("employer.saveCandidate")}
         </Button>
         <Button size="lg" onClick={() => act("invited")} disabled={pending}>
-          Invite
+          <Icon name="send" className="h-4 w-4" />
+          {t("employer.invite")}
         </Button>
       </div>
 
       <MatchCelebration
         open={!!matchHref}
         chatHref={matchHref ?? "#"}
-        subtitle={matchName ? `You and ${matchName} are connected.` : undefined}
+        subtitle={matchName || undefined}
         onClose={() => {
           setMatchHref(null);
           router.refresh();

@@ -6,12 +6,20 @@
  * The point: replace "DM us your CV" with "Apply through GoJob". Employers
  * share a public job link to Instagram/WhatsApp; candidates land on the public
  * job page and apply (creating an account inline if needed).
+ *
+ * Now built on `Sheet` — which was extracted from this component's own overlay
+ * and then never adopted here, leaving the share sheet without a dialog role,
+ * Escape, focus trap, focus restore or scroll lock.
  */
 
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { Button } from "./ui";
+import { Button, interactive } from "./ui";
+import { Icon } from "./Icon";
+import { Sheet } from "./Sheet";
 import { useToast } from "./Toast";
+import { useT } from "@/lib/i18n/client";
+import { cn } from "@/lib/cn";
 
 export function ShareJob({
   jobId,
@@ -22,6 +30,7 @@ export function ShareJob({
   role: string;
   businessName: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [qr, setQr] = useState<string | null>(null);
@@ -41,21 +50,27 @@ export function ShareJob({
       .catch(() => setQr(null));
   }, [open, url]);
 
-  const message = `We're hiring a ${role} at ${businessName}. Apply here: ${url}`;
+  const message = `${role} · ${businessName} — ${url}`;
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(url);
-      show("Link copied");
+      show(t("job.linkCopied"));
+      return true;
     } catch {
-      show("Could not copy — select the link manually", "error");
+      show(t("job.copyFailed"), "error");
+      return false;
     }
   }
 
   async function nativeShare() {
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
-        await navigator.share({ title: `${role} at ${businessName}`, text: message, url });
+        await navigator.share({
+          title: `${role} — ${businessName}`,
+          text: message,
+          url,
+        });
         return true;
       } catch {
         /* user cancelled */
@@ -64,79 +79,63 @@ export function ShareJob({
     return false;
   }
 
+  const tile = cn(
+    "flex items-center justify-center gap-2 rounded-control border border-border bg-surface px-4 py-3 text-sm font-semibold no-underline",
+    interactive,
+    "hover:bg-surface-muted",
+  );
+
   return (
     <>
       <Button variant="outline" className="w-full" onClick={openSheet}>
-        🔗 Share job
+        <Icon name="share" className="h-4 w-4" />
+        {t("job.shareButton")}
       </Button>
 
-      {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-6"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-t-3xl bg-surface p-6 sm:rounded-3xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-bold">Share this job</h2>
-                <p className="text-sm text-muted">
-                  Post it to Instagram or WhatsApp — candidates apply through GoJob.
-                </p>
-              </div>
-              <button
-                onClick={() => setOpen(false)}
-                className="-m-2 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-xl leading-none text-muted outline-none transition-colors hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-brand/40"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mb-4 flex items-center gap-2 rounded-xl border border-border bg-slate-50 p-3">
-              <span className="min-w-0 flex-1 truncate text-sm text-slate-600">{url}</span>
-              <Button size="sm" onClick={copy}>
-                Copy
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <a
-                href={`https://wa.me/?text=${encodeURIComponent(message)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-semibold outline-none transition-colors hover:bg-slate-50 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-brand/40"
-              >
-                💬 WhatsApp
-              </a>
-              <button
-                onClick={async () => {
-                  const shared = await nativeShare();
-                  if (!shared) {
-                    await copy();
-                    show("Link copied — paste it in your Instagram bio or story");
-                  }
-                }}
-                className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-semibold outline-none transition-colors hover:bg-slate-50 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-brand/40"
-              >
-                📷 Instagram
-              </button>
-            </div>
-
-            {qr && (
-              <div className="mt-4 flex flex-col items-center rounded-xl border border-border p-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={qr} alt="QR code linking to the job" className="h-40 w-40" />
-                <p className="mt-2 text-xs text-muted">
-                  Print it for the venue — scan to apply.
-                </p>
-              </div>
-            )}
-          </div>
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={t("job.shareTitle")}
+        description={t("job.shareHint")}
+      >
+        <div className="mb-4 flex items-center gap-2 rounded-control border border-border bg-surface-muted p-3">
+          <span className="min-w-0 flex-1 truncate text-sm text-subtle">{url}</span>
+          <Button size="sm" onClick={copy}>
+            {t("job.copyLink")}
+          </Button>
         </div>
-      )}
+
+        <div className="grid grid-cols-2 gap-2">
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(message)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={tile}
+          >
+            <Icon name="chat" className="h-4 w-4" />
+            {t("job.shareWhatsApp")}
+          </a>
+          <button
+            type="button"
+            onClick={async () => {
+              const shared = await nativeShare();
+              if (!shared && (await copy())) show(t("job.instagramHint"));
+            }}
+            className={tile}
+          >
+            <Icon name="share" className="h-4 w-4" />
+            {t("job.shareInstagram")}
+          </button>
+        </div>
+
+        {qr && (
+          <div className="mt-4 flex flex-col items-center rounded-control border border-border p-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={qr} alt={t("job.qrAlt")} className="h-40 w-40" />
+            <p className="mt-2 text-center text-xs text-muted">{t("job.qrHint")}</p>
+          </div>
+        )}
+      </Sheet>
     </>
   );
 }

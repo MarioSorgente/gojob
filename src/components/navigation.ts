@@ -1,7 +1,11 @@
+import type { IconName } from "./Icon";
+
 export interface NavItem {
   href: string;
   label: string;
-  icon: string;
+  /** A key into the icon set — a plain string union, so it crosses the
+   *  server→client boundary in AppShell without needing a component prop. */
+  icon: IconName;
   /** Optional unread/notification count. */
   badge?: number;
 }

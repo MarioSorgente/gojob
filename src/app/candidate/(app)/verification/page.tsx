@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { getCandidate } from "@/lib/repos/candidates";
 import { computeProfileStrength } from "@/lib/profileStrength";
-import { PageTitle } from "@/components/ui";
+import { BackLink, PageTitle } from "@/components/ui";
+import { getT } from "@/lib/i18n/server";
 import { ProfileStrengthCard } from "@/components/candidate/ProfileStrengthCard";
 import { VerificationPanel } from "@/components/candidate/VerificationPanel";
 
@@ -12,16 +12,16 @@ export default async function VerificationPage() {
   const c = await getCandidate(user.uid);
   if (!c) redirect("/candidate/onboarding");
 
+  const t = await getT();
+
   return (
     <div className="space-y-4">
-      <Link href="/candidate/profile" className="text-sm text-muted">
-        ← Profile
-      </Link>
+      <BackLink href="/candidate/profile">{t("nav.profile")}</BackLink>
       <PageTitle
-        title="Verification"
-        subtitle="Optional — but verified profiles get matched more often."
+        title={t("candidate.verification")}
+        subtitle={t("candidate.noInvitationsHint")}
       />
-      <ProfileStrengthCard strength={computeProfileStrength(c)} />
+      <ProfileStrengthCard strength={computeProfileStrength(c)} t={t} />
       <VerificationPanel
         uid={user.uid}
         name={`${c.firstName} ${c.lastName}`.trim()}
