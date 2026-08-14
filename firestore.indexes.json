@@ -29,6 +29,7 @@
       "collectionGroup": "candidates",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "roles", "arrayConfig": "CONTAINS" },
         { "fieldPath": "profileStrength", "order": "DESCENDING" },
         { "fieldPath": "userId", "order": "DESCENDING" }
       ]
@@ -37,7 +38,6 @@
       "collectionGroup": "candidates",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "roles", "arrayConfig": "CONTAINS" },
         { "fieldPath": "profileStrength", "order": "DESCENDING" },
         { "fieldPath": "userId", "order": "DESCENDING" }
       ]
