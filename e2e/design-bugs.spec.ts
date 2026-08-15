@@ -72,7 +72,11 @@ test.describe("session and back navigation", () => {
 
   test("logging out then going back does not show a signed-in page", async ({ page }) => {
     await login(page, CANDIDATE);
-    await page.getByRole("button", { name: /log out/i }).first().click();
+    await page
+      .getByRole("button", { name: /log out/i })
+      .filter({ visible: true })
+      .first()
+      .click();
     await page.waitForURL((u) => u.pathname === "/", { waitUntil: "domcontentloaded" });
     await page.goBack({ waitUntil: "domcontentloaded" }).catch(() => {});
     await expect(page.getByRole("button", { name: /log out/i })).toHaveCount(0);
