@@ -65,6 +65,34 @@ describe("activeNavHref", () => {
     );
   });
 
+  it("keeps Chats selected while reading a conversation", () => {
+    // A conversation lives at /candidate/chat/{id}, outside /candidate/matches.
+    // Without `owns` it fell back to the section root and lit up "For you"
+    // while the user was mid-conversation.
+    const withOwns: NavItem[] = CANDIDATE.map((i) =>
+      i.href === "/candidate/matches" ? { ...i, owns: ["/candidate/chat"] } : i,
+    );
+    expect(activeNavHref("/candidate/chat/abc123", withOwns)).toBe(
+      "/candidate/matches",
+    );
+
+    const employer: NavItem[] = EMPLOYER.map((i) =>
+      i.href === "/employer/matches" ? { ...i, owns: ["/employer/chat"] } : i,
+    );
+    expect(activeNavHref("/employer/chat/abc123", employer)).toBe(
+      "/employer/matches",
+    );
+  });
+
+  it("prefers a real sub-route over an owned prefix", () => {
+    const items: NavItem[] = [
+      { href: "/candidate", label: "For you", icon: "search" },
+      { href: "/candidate/matches", label: "Chats", icon: "chat", owns: ["/candidate"] },
+      { href: "/candidate/search", label: "Search", icon: "search" },
+    ];
+    expect(activeNavHref("/candidate/search", items)).toBe("/candidate/search");
+  });
+
   it("returns null when nothing matches", () => {
     expect(activeNavHref("/admin/users", EMPLOYER)).toBeNull();
     expect(activeNavHref("/login", CANDIDATE)).toBeNull();

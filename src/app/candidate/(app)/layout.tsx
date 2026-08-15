@@ -47,6 +47,7 @@ export default async function CandidateAppLayout({
       label: t("nav.chats"),
       icon: "chat",
       badge: unread || undefined,
+      owns: ["/candidate/chat"],
     },
     { href: "/candidate/profile", label: t("nav.profile"), icon: "user" },
   ];
