@@ -29,6 +29,8 @@ export async function AppShell({
   children: ReactNode;
 }) {
   const { locale, t } = await getI18n();
+  // The section root is always the first nav item (/candidate or /employer).
+  const homeHref = items[0]?.href ?? "/";
 
   return (
     <div className="app-shell min-h-dvh md:pl-60">
@@ -42,6 +44,7 @@ export async function AppShell({
 
       <SideNav
         items={items}
+        homeHref={homeHref}
         footer={
           <div className="flex items-center justify-between gap-2">
             <LogoutButton label={t("common.logOut")} />
@@ -53,6 +56,7 @@ export async function AppShell({
       {/* The top bar is redundant once the sidebar carries the logo and sign-out. */}
       <div className="md:hidden">
         <TopBar
+          homeHref={homeHref}
           right={
             <div className="flex items-center gap-1.5">
               <LocaleSwitcher current={locale} />

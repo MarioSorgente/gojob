@@ -6,9 +6,12 @@ import { BackLink } from "./ui";
 export function TopBar({
   right,
   back,
+  /** See the note in SideNav — inside the app the logo means "my dashboard". */
+  homeHref = "/",
 }: {
   right?: ReactNode;
   back?: { href: string; label: string };
+  homeHref?: string;
 }) {
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-surface/95 backdrop-blur">
@@ -17,7 +20,7 @@ export function TopBar({
           <BackLink href={back.href}>{back.label}</BackLink>
         ) : (
           <Link
-            href="/"
+            href={homeHref}
             className="rounded outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             <Logo size="sm" />

@@ -84,7 +84,11 @@ export function JobForm({ businessArea }: { businessArea: string }) {
   return (
     <form onSubmit={submit} className="space-y-4 pb-24">
       <SectionCard title="Role">
-        <Select value={role} onChange={(e) => setRole(e.target.value)}>
+        <Select
+          aria-label="Role"
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+        >
           {ROLES.map((r) => (
             <option key={r}>{r}</option>
           ))}
@@ -120,6 +124,7 @@ export function JobForm({ businessArea }: { businessArea: string }) {
 
       <SectionCard title="Salary">
         <Select
+          aria-label="Salary type"
           value={salaryType}
           onChange={(e) => setSalaryType(e.target.value as SalaryType)}
         >
@@ -171,6 +176,7 @@ export function JobForm({ businessArea }: { businessArea: string }) {
             value={customSkill}
             onChange={(e) => setCustomSkill(e.target.value)}
             placeholder="Add a required skill"
+            aria-label="Add a required skill"
           />
           <Button
             type="button"
@@ -206,6 +212,7 @@ export function JobForm({ businessArea }: { businessArea: string }) {
         {languages.map((l, i) => (
           <div key={i} className="flex gap-2">
             <Select
+              aria-label="Language"
               value={l.language}
               onChange={(e) => {
                 const copy = [...languages];
@@ -218,6 +225,7 @@ export function JobForm({ businessArea }: { businessArea: string }) {
               ))}
             </Select>
             <Select
+              aria-label="Minimum proficiency"
               value={l.minimumLevel}
               onChange={(e) => {
                 const copy = [...languages];

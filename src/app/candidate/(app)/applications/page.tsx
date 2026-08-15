@@ -5,7 +5,7 @@ import { listCandidateApplications } from "@/lib/repos/pipeline";
 import { getI18n } from "@/lib/i18n/server";
 import { roleLabel } from "@/lib/i18n/taxonomy";
 import { formatRelativeTime } from "@/lib/format";
-import { ButtonLink, Card, EmptyState, PageTitle } from "@/components/ui";
+import { BackLink, ButtonLink, Card, EmptyState, PageTitle } from "@/components/ui";
 import { MatchPercent } from "@/components/cards/match";
 import { JobMeta } from "@/components/cards/JobMeta";
 import { StageBadge } from "@/components/StageBadge";
@@ -24,6 +24,7 @@ export default async function ApplicationsPage() {
 
   return (
     <>
+      <BackLink href="/candidate">{t("nav.forYou")}</BackLink>
       <PageTitle
         title={t("candidate.applicationsTitle")}
         subtitle={t("candidate.applicationsSubtitle")}

@@ -13,7 +13,7 @@ export default async function EditBusinessPage() {
   const t = await getT();
 
   return (
-    <div className="mx-auto max-w-md px-5 py-6">
+    <main className="mx-auto max-w-md px-5 py-6">
       <BackLink href="/employer/business">{t("nav.venue")}</BackLink>
       <h1 className="type-title mb-4 mt-2">{t("employer.editVenue")}</h1>
       <BusinessForm
@@ -29,6 +29,6 @@ export default async function EditBusinessPage() {
           description: b.description,
         }}
       />
-    </div>
+    </main>
   );
 }

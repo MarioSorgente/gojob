@@ -39,12 +39,12 @@ export default async function CandidateEditPage() {
   const t = await getT();
 
   return (
-    <div className="mx-auto max-w-md px-5 py-6">
+    <main className="mx-auto max-w-md px-5 py-6">
       <BackLink href="/candidate/profile">{t("nav.profile")}</BackLink>
       <h1 className="type-title mt-2">{t("candidate.editProfile")}</h1>
       <div className="mt-4">
         <OnboardingForm defaults={defaults} submitLabel={t("common.save")} />
       </div>
-    </div>
+    </main>
   );
 }

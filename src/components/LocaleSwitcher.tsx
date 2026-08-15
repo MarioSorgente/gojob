@@ -60,7 +60,10 @@ export function LocaleSwitcher({
             disabled={pending || active}
             onClick={() => start(() => setLocaleAction(locale))}
             className={cn(
-              "min-h-7 rounded-full px-2.5 text-xs font-bold",
+              // The pill stays visually compact, but the hit area is padded out
+              // to the 44px guideline via a pseudo-element so touch works.
+              "relative min-h-7 rounded-full px-2.5 text-xs font-bold",
+              "after:absolute after:left-0 after:top-1/2 after:h-11 after:w-full after:-translate-y-1/2 after:content-['']",
               interactive,
               "disabled:pointer-events-none disabled:opacity-100",
               active

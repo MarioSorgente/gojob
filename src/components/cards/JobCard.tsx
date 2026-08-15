@@ -43,24 +43,33 @@ export function JobCard({
   const acted = action === "applied" || action === "passed";
 
   return (
-    // A "stretched link": the anchor covers the card, and controls that need
-    // their own click sit above it. Wrapping the card in <Link> instead would
-    // put a <button> inside an <a> — invalid markup that also swallows keyboard
-    // activation of the inner control.
     <article
       className={`relative flex h-full flex-col rounded-card border border-border bg-surface p-4 shadow-card transition-[border-color,box-shadow] hover:border-brand/40 hover:shadow-raised focus-within:ring-2 focus-within:ring-brand/40 ${
         acted ? "opacity-75" : ""
       }`}
     >
+      {/*
+        A "stretched link": the anchor covers the whole card.
+
+        It must have **no** `z-index` and the content must be **unpositioned**.
+        Positioned elements paint above unpositioned ones, so the link ends up on
+        top of the text and the entire card is clickable. The previous version
+        gave the link `z-0` and every content block `relative` — which put those
+        blocks in the same paint layer, later in tree order, so they covered the
+        link. Only the thin gaps between them responded to a click; the title,
+        salary and posted date did nothing.
+
+        Controls that need their own click get `relative z-10` to sit back on top.
+      */}
       {href && (
-        <Link href={href} className="absolute inset-0 z-0 rounded-card outline-none">
+        <Link href={href} className="absolute inset-0 rounded-card outline-none">
           <span className="sr-only">
             {roleLabel(job.role, locale)} — {job.businessName}
           </span>
         </Link>
       )}
 
-      <div className="relative flex items-start gap-3">
+      <div className="flex items-start gap-3">
         <Avatar name={job.businessName} size={44} />
 
         <div className="min-w-0 flex-1">
@@ -87,7 +96,7 @@ export function JobCard({
           ))}
       </div>
 
-      <div className="relative mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted">
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted">
         <span className="inline-flex items-center gap-1">
           <Icon name="mapPin" className="h-4 w-4" />
           {areaLabel(job.area, locale)}
@@ -98,7 +107,7 @@ export function JobCard({
         </span>
       </div>
 
-      <p className="relative mt-2 inline-flex items-center gap-1.5 font-semibold">
+      <p className="mt-2 inline-flex items-center gap-1.5 font-semibold">
         <Icon name="wallet" className="h-4 w-4 text-muted" />
         {salary || (
           <span className="font-normal text-muted">{t("job.salaryUndisclosed")}</span>
@@ -106,12 +115,12 @@ export function JobCard({
       </p>
 
       {reasons && reasons.length > 0 && (
-        <div className="relative mt-3">
+        <div className="mt-3">
           <ReasonList reasons={reasons} limit={2} />
         </div>
       )}
 
-      <div className="relative mt-3 flex items-center justify-between gap-2 border-t border-border/70 pt-2.5 text-xs text-muted">
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/70 pt-2.5 text-xs text-muted">
         <span>
           {t("job.postedAgo", { time: formatRelativeTime(job.createdAt, locale) })}
         </span>

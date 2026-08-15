@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
-import { Alert, Badge, Button, Card, PageTitle } from "@/components/ui";
+import { Alert, BackLink, Badge, Button, Card, PageTitle } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 
 /**
@@ -54,6 +54,7 @@ export default async function PlansPage() {
 
   return (
     <>
+      <BackLink href="/employer/business">Venue</BackLink>
       <PageTitle title="Plans" subtitle="Candidates are always free. Employers pay to hire." />
 
       <Alert tone="info" className="mb-4">
