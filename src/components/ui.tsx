@@ -6,6 +6,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { Icon, type IconName } from "./Icon";
 
@@ -84,13 +85,16 @@ export function ButtonLink({
   variant = "primary",
   size = "md",
   className,
+  href,
   ...props
-}: AnchorHTMLAttributes<HTMLAnchorElement> & {
+}: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
+  href: string;
   variant?: ButtonVariant;
   size?: ButtonSize;
 }) {
   return (
-    <a
+    <Link
+      href={href}
       className={cn(
         "inline-flex select-none items-center justify-center gap-2 rounded-control font-semibold no-underline",
         interactive,
@@ -106,10 +110,12 @@ export function ButtonLink({
 /** An inline text link. Replaces the same class string copy-pasted at 4 sites. */
 export function TextLink({
   className,
+  href,
   ...props
-}: AnchorHTMLAttributes<HTMLAnchorElement>) {
+}: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & { href: string }) {
   return (
-    <a
+    <Link
+      href={href}
       className={cn(
         "rounded font-semibold text-brand outline-none hover:text-brand-dark focus-visible:ring-2 focus-visible:ring-brand/40",
         className,
@@ -566,7 +572,7 @@ export function BackLink({
   className?: string;
 }) {
   return (
-    <a
+    <Link
       href={href}
       className={cn(
         "-ml-2 inline-flex min-h-11 items-center gap-1.5 rounded-control px-2 text-sm font-medium text-muted",
@@ -577,7 +583,7 @@ export function BackLink({
     >
       <Icon name="arrowLeft" className="h-4 w-4" />
       {children}
-    </a>
+    </Link>
   );
 }
 

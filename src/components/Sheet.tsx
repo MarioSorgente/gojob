@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import { Icon } from "./Icon";
 import { useT } from "@/lib/i18n/client";
@@ -103,9 +104,23 @@ export function Sheet({
     return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [open, close]);
 
-  if (!open) return null;
+  // `open` is always false during server rendering — every caller drives it from
+  // `useState(false)` — so there is no hydration mismatch to guard against, only
+  // the absence of a DOM to portal into.
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  /**
+   * Rendered into <body>, not in place.
+   *
+   * `position: fixed` resolves against the nearest ancestor with a `transform`,
+   * `filter` or `contain` — not the viewport. The swipe deck applies a live
+   * `translateX()` to the card it drags, and the chat shell sets
+   * `overflow: hidden`. Rendering inline meant a sheet opened from inside either
+   * one was positioned and clipped relative to that card instead of covering the
+   * page: it looked like an inline panel jammed into the layout rather than a
+   * dialog, and the backdrop never covered the background.
+   */
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-6"
       onClick={close}
@@ -148,6 +163,7 @@ export function Sheet({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

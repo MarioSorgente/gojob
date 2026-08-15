@@ -11,13 +11,13 @@ export default async function EmployerOnboardingPage() {
   if (existing && user.onboardingComplete) redirect("/employer");
 
   return (
-    <div className="mx-auto max-w-md px-5 py-6">
+    <main className="mx-auto max-w-md px-5 py-6">
       <Logo className="mb-4" />
       <h1 className="text-2xl font-bold">Set up your venue</h1>
       <p className="mt-1 mb-5 text-sm text-muted">
         This is what candidates see. You can edit it anytime.
       </p>
       <BusinessForm />
-    </div>
+    </main>
   );
 }

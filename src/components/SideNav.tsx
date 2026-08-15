@@ -12,7 +12,18 @@ import { activeNavHref, type NavItem } from "./navigation";
  *
  * Takes the same NavItem[] the bottom bar uses, so the two can't drift apart.
  */
-export function SideNav({ items, footer }: { items: NavItem[]; footer?: React.ReactNode }) {
+export function SideNav({
+  items,
+  footer,
+  /** Where the logo points. Inside the app that is the user's dashboard — the
+   *  logo is the universal "home" affordance, and sending a signed-in user to
+   *  the marketing page reads as being logged out. */
+  homeHref = "/",
+}: {
+  items: NavItem[];
+  footer?: React.ReactNode;
+  homeHref?: string;
+}) {
   const pathname = usePathname();
   const active = activeNavHref(pathname, items);
 
@@ -20,7 +31,7 @@ export function SideNav({ items, footer }: { items: NavItem[]; footer?: React.Re
     <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-border bg-surface md:flex">
       <div className="px-6 py-5">
         <Link
-          href="/"
+          href={homeHref}
           className="inline-block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           <Logo size="md" />

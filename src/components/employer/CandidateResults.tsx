@@ -84,7 +84,7 @@ export function CandidateResults({
             />
             <Link
               href={`/employer/candidates/${c.userId}`}
-              className="absolute inset-0 z-0 rounded-card outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="absolute inset-0 rounded-card outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <span className="sr-only">{c.firstName}</span>
             </Link>

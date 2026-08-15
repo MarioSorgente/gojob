@@ -81,6 +81,8 @@ export function ImageUpload({
         ref={inputRef}
         type="file"
         accept="image/*"
+        aria-label={label}
+        tabIndex={-1}
         onChange={onPick}
         className="hidden"
       />

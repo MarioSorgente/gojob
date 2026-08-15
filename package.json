@@ -16,7 +16,8 @@
     "seed:prod": "tsx scripts/seed.ts --prod",
     "migrate:conversation-activity": "tsx scripts/backfill-conversation-activity.ts",
     "migrate:conversation-activity:prod": "tsx scripts/backfill-conversation-activity.ts --prod",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "design:audit": "tsx scripts/design-audit.mjs"
   },
   "overrides": {
     "jose": "^5.10.0"

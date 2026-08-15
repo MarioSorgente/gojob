@@ -18,6 +18,7 @@ import {
 import {
   Alert,
   Button,
+  Checkbox,
   Chip,
   Field,
   Input,
@@ -189,15 +190,11 @@ export function OnboardingForm({
             placeholder="Indonesian"
           />
         </Field>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={workEligibility}
-            onChange={(e) => setWorkEligibility(e.target.checked)}
-            className="h-4 w-4 rounded border-border accent-[var(--brand)]"
-          />
-          I confirm I&apos;m legally allowed to work in Bali.
-        </label>
+        <Checkbox
+          label="I confirm I'm legally allowed to work in Bali."
+          checked={workEligibility}
+          onChange={(e) => setWorkEligibility(e.target.checked)}
+        />
       </SectionCard>
 
       <SectionCard title="Location">
@@ -221,6 +218,7 @@ export function OnboardingForm({
             value={customRole}
             onChange={(e) => setCustomRole(e.target.value)}
             placeholder="Add another role"
+            aria-label="Add another role"
           />
           <Button
             type="button"
@@ -273,6 +271,7 @@ export function OnboardingForm({
 
       <SectionCard title="Availability">
         <Select
+          aria-label="When can you start?"
           value={availabilityType}
           onChange={(e) => setAvailabilityType(e.target.value)}
         >
@@ -283,6 +282,7 @@ export function OnboardingForm({
         {availabilityType === "Custom date" && (
           <Input
             type="date"
+            aria-label="Available from"
             value={availableFrom}
             onChange={(e) => setAvailableFrom(e.target.value)}
           />
@@ -293,6 +293,7 @@ export function OnboardingForm({
         {languages.map((l, i) => (
           <div key={i} className="flex gap-2">
             <Select
+              aria-label="Language"
               value={l.language}
               onChange={(e) => {
                 const copy = [...languages];
@@ -305,6 +306,7 @@ export function OnboardingForm({
               ))}
             </Select>
             <Select
+              aria-label="Proficiency level"
               value={l.level}
               onChange={(e) => {
                 const copy = [...languages];
@@ -349,6 +351,7 @@ export function OnboardingForm({
             value={customSkill}
             onChange={(e) => setCustomSkill(e.target.value)}
             placeholder="Add a skill"
+            aria-label="Add a skill"
           />
           <Button
             type="button"
@@ -366,6 +369,7 @@ export function OnboardingForm({
             <div className="grid grid-cols-2 gap-2">
               <Input
                 placeholder="Venue / business"
+                aria-label="Venue / business"
                 value={exp.companyName}
                 onChange={(e) => {
                   const copy = [...experiences];
@@ -375,6 +379,7 @@ export function OnboardingForm({
               />
               <Input
                 placeholder="Job title"
+                aria-label="Job title"
                 value={exp.role}
                 onChange={(e) => {
                   const copy = [...experiences];
@@ -410,21 +415,18 @@ export function OnboardingForm({
                 />
               </label>
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={exp.current}
-                onChange={(e) => {
-                  const copy = [...experiences];
-                  copy[i] = { ...copy[i], current: e.target.checked };
-                  setExperiences(copy);
-                }}
-                className="h-4 w-4 accent-[var(--brand)]"
-              />
-              I currently work here
-            </label>
+            <Checkbox
+              label="I currently work here"
+              checked={exp.current}
+              onChange={(e) => {
+                const copy = [...experiences];
+                copy[i] = { ...copy[i], current: e.target.checked };
+                setExperiences(copy);
+              }}
+            />
             <Input
               placeholder="Short description"
+              aria-label="Short description"
               value={exp.description}
               onChange={(e) => {
                 const copy = [...experiences];
