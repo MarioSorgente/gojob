@@ -38,8 +38,30 @@ All 33 MVP screens from the product scope are built.
 
 - **Node.js 18+**
 - **Java 11+** — required by the Firebase Emulator Suite (Firestore/Auth
-  emulators run on a JVM). Install a JDK (e.g. Microsoft OpenJDK / Temurin) and
-  make sure `java -version` works.
+  emulators run on a JVM). Install a JDK and make sure `java -version` works.
+
+  <details>
+  <summary>Installing a JDK without admin rights (Windows)</summary>
+
+  `winget install Microsoft.OpenJDK.21` is the simplest route, but it needs
+  elevation. Without admin, a portable Temurin build works just as well:
+
+  ```powershell
+  $api = "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=windows&vendor=eclipse"
+  $b   = (Invoke-RestMethod -Uri $api)[0].binary
+  $zip = "$env:TEMP\$($b.package.name)"
+  Invoke-WebRequest -Uri $b.package.link -OutFile $zip
+  if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne $b.package.checksum) { throw "checksum mismatch" }
+  $dest = "$env:LOCALAPPDATA\Programs\Eclipse Adoptium"
+  Expand-Archive -Path $zip -DestinationPath $dest -Force
+  $jdk = (Get-ChildItem $dest -Directory | Where-Object { Test-Path "$($_.FullName)\bin\java.exe" })[0].FullName
+  [Environment]::SetEnvironmentVariable("JAVA_HOME", $jdk, "User")
+  [Environment]::SetEnvironmentVariable("Path", "$([Environment]::GetEnvironmentVariable('Path','User'));$jdk\bin", "User")
+  ```
+
+  Open a **new** terminal afterwards — already-running shells keep the
+  environment they inherited at launch.
+  </details>
 - **firebase-tools** — installed on demand via `npx`, or globally:
   `npm i -g firebase-tools`
 
