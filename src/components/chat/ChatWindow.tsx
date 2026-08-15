@@ -140,7 +140,10 @@ export function ChatWindow({
   return (
     <div className="flex h-full flex-col">
       <div
-        className="flex-1 space-y-2 overflow-y-auto px-1 py-3"
+        // `justify-end` on a flex column pins a short thread to the bottom;
+        // once it overflows, `overflow-y-auto` takes over and it scrolls
+        // normally. Top-aligned messages left a wall of empty space below.
+        className="flex flex-1 flex-col justify-end space-y-2 overflow-y-auto px-1 py-3"
         role="log"
         aria-live="polite"
         aria-label={t("chat.messages")}

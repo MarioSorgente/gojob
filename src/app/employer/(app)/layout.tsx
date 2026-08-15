@@ -45,6 +45,7 @@ export default async function EmployerAppLayout({
       label: t("nav.chats"),
       icon: "chat",
       badge: unread || undefined,
+      owns: ["/employer/chat"],
     },
     { href: "/employer/business", label: t("nav.venue"), icon: "building" },
   ];

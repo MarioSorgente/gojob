@@ -8,6 +8,14 @@ export interface NavItem {
   icon: IconName;
   /** Optional unread/notification count. */
   badge?: number;
+  /**
+   * Extra route prefixes this tab owns.
+   *
+   * A conversation lives at `/candidate/chat/{id}`, which is not under
+   * `/candidate/matches`, so it used to fall through to the section root and
+   * light up "For you" while the user was reading a message.
+   */
+  owns?: string[];
 }
 
 /** Section roots, which own any route that no other tab claims. */
@@ -32,6 +40,12 @@ export function activeNavHref(pathname: string, items: NavItem[]): string | null
     .filter((i) => !ROOTS.has(i.href) && pathname.startsWith(`${i.href}/`))
     .sort((a, b) => b.href.length - a.href.length)[0];
   if (nested) return nested.href;
+
+  // Routes a tab explicitly claims but doesn't sit under.
+  const owned = items.find((i) =>
+    i.owns?.some((p) => pathname === p || pathname.startsWith(`${p}/`)),
+  );
+  if (owned) return owned.href;
 
   const root = items.find(
     (i) => ROOTS.has(i.href) && (pathname === i.href || pathname.startsWith(`${i.href}/`)),

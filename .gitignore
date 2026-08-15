@@ -50,3 +50,7 @@ storage-debug.log
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright
+/e2e-report/
+/test-results/
