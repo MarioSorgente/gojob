@@ -23,8 +23,11 @@ export function LogoutButton({ label }: { label: string }) {
           // signed-in-looking page one Back press away. See AuthForm for the
           // mirror image of this on the way in. The Next lint rule prefers a soft
           // navigation for speed, which is the behaviour being avoided here.
-          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-          window.location.assign("/");
+          //
+          // `replace` so Back from the landing page cannot return to a page that
+          // needs a session — that entry would only bounce through middleware
+          // to /login, which reads as the app losing your place.
+          window.location.replace("/");
         }
       }}
       disabled={pending}

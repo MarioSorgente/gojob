@@ -88,7 +88,10 @@ test.describe("candidate chat", () => {
     await page.waitForURL(/\/candidate\/chat\//, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("log")).toBeVisible({ timeout: 20_000 });
 
-    await page.locator('a[href="/candidate/matches"]').first().click();
+    await page
+      .locator('[data-chat-workspace] a[href="/candidate/matches"]')
+      .first()
+      .click();
     await expect(page).toHaveURL(/\/candidate\/matches/);
   });
 });

@@ -54,11 +54,16 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
    * sign-in — a once-per-session event — re-renders everything with the session
    * cookie present.
    *
-   * eslint-disable below is deliberate: the Next rule prefers a soft navigation
-   * for speed, which is exactly the behaviour this is avoiding.
+   * `replace`, not `assign`: the login form must not stay in the back stack.
+   * With `assign` it did, and because /login redirects an authenticated visitor
+   * to their dashboard, pressing Back bounced straight forward again — Back
+   * appeared to do nothing. Replacing the entry means Back returns to whatever
+   * the user was looking at before they started signing in.
+   *
+   * The Next lint rule that prefers a soft navigation only flags `assign`, so
+   * no suppression is needed here — but the reasoning is the same either way.
    */
-  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-  const go = () => window.location.assign(next);
+  const go = () => window.location.replace(next);
 
   async function run(fn: () => Promise<void>) {
     setBusy(true);
