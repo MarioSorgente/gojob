@@ -5,6 +5,7 @@
  */
 
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { adminAuth, adminDb } from "./firebase/admin";
@@ -12,7 +13,7 @@ import { SESSION_COOKIE } from "./session";
 import type { AppUser, UserRole } from "./types";
 
 /** Returns the signed-in user, or null. Never throws. */
-export async function getSessionUser(): Promise<AppUser | null> {
+async function uncachedGetSessionUser(): Promise<AppUser | null> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -41,6 +42,9 @@ export async function getSessionUser(): Promise<AppUser | null> {
   }
 }
 
+/** Request-scoped session lookup shared by every caller in a React render. */
+export const getSessionUser = cache(uncachedGetSessionUser);
+
 /** Require a signed-in user or redirect to /login. */
 export async function requireUser(): Promise<AppUser> {
   const user = await getSessionUser();
@@ -63,7 +67,9 @@ export async function requireRole(role: UserRole): Promise<AppUser> {
 }
 
 /** Where a user should land based on role + onboarding status. */
-export function homePathFor(user: Pick<AppUser, "role" | "onboardingComplete">): string {
+export function homePathFor(
+  user: Pick<AppUser, "role" | "onboardingComplete">,
+): string {
   if (!user.role) return "/onboarding";
   if (user.role === "employer") {
     return user.onboardingComplete ? "/employer" : "/employer/onboarding";
