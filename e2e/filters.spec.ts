@@ -7,7 +7,13 @@ import { EMPLOYER, login } from "./helpers";
  * still entering the number. Edits are now staged behind an Apply button.
  */
 
-test.use({ viewport: { width: 1440, height: 900 } });
+// The rail is `hidden lg:block` — it does not exist on a phone, where the
+// bottom sheet covers the same ground. Running these under the mobile project
+// asserted against markup that is deliberately absent.
+test.skip(
+  ({ isMobile }) => Boolean(isMobile),
+  "filter rail is desktop-only; mobile uses the sheet",
+);
 
 test.describe("desktop filter rail", () => {
   test("editing filters does not navigate until Apply is pressed", async ({
