@@ -6,6 +6,12 @@ export const COLLECTIONS = {
   jobs: "jobs",
   /** Subcollection of a job: the ranked (job, candidate) shortlist. */
   shortlist: "shortlist",
+  /** Candidate-owned, precomputed job ranking. */
+  recommendations: "recommendations",
+  /** Durable Firestore-backed work queue for ranking fan-outs. */
+  recommendationTasks: "recommendationTasks",
+  /** Temporary fallback rankings used while projections are being deployed. */
+  recommendationWindows: "recommendationWindows",
   matches: "matches",
   conversations: "conversations",
   /** Per-user notification counters, keyed by the user's uid. */

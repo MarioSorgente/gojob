@@ -7,6 +7,10 @@ import { candidateMatchesFilters, type CandidateFilters } from "../search";
 import { withIndexFallback } from "../firestoreErrors";
 import { recordCandidateSearch } from "../candidateSearchMetrics";
 import {
+  candidateMatchingFingerprint,
+  enqueueCandidateRecommendations,
+} from "../recommendationTasks";
+import {
   PAGE_SIZE,
   decodeCursor,
   encodeCursor,
@@ -72,6 +76,12 @@ export async function upsertCandidate(
 
   merged.profileStrength = computeProfileStrength(merged).percent;
   await ref.set(merged);
+  if (
+    candidateMatchingFingerprint(existing) !==
+    candidateMatchingFingerprint(merged)
+  ) {
+    await enqueueCandidateRecommendations(uid);
+  }
   return merged;
 }
 

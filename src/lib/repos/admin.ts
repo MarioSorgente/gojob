@@ -2,6 +2,7 @@ import "server-only";
 import { adminDb } from "../firebase/admin";
 import { COLLECTIONS } from "../collections";
 import { computeProfileStrength } from "../profileStrength";
+import { enqueueJobRecommendations } from "../recommendationTasks";
 import type {
   AppUser,
   Business,
@@ -172,9 +173,14 @@ export async function setCandidateEmploymentStatus(
 
   // Reflect the decision on every experience awaiting review.
   const experiences = (profile.experiences ?? []).map((e) =>
-    e.verificationStatus === "pending" ? { ...e, verificationStatus: status } : e,
+    e.verificationStatus === "pending"
+      ? { ...e, verificationStatus: status }
+      : e,
   );
-  await ref.set({ verification: { employment: status }, experiences }, { merge: true });
+  await ref.set(
+    { verification: { employment: status }, experiences },
+    { merge: true },
+  );
   await refreshStrength(candidateId);
 }
 
@@ -192,5 +198,9 @@ export async function setJobStatus(
   jobId: string,
   status: "live" | "closed",
 ): Promise<void> {
-  await adminDb().collection(COLLECTIONS.jobs).doc(jobId).set({ status }, { merge: true });
+  await adminDb()
+    .collection(COLLECTIONS.jobs)
+    .doc(jobId)
+    .set({ status }, { merge: true });
+  await enqueueJobRecommendations(jobId);
 }

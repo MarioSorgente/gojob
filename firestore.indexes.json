@@ -1,6 +1,22 @@
 {
   "indexes": [
     {
+      "collectionGroup": "recommendationTasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "startedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "recommendations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "score", "order": "DESCENDING" },
+        { "fieldPath": "jobId", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "messages",
       "queryScope": "COLLECTION",
       "fields": [
