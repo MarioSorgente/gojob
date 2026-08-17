@@ -296,6 +296,8 @@ export const id: Dictionary = {
   "chat.messageLabel": "Pesan",
   "chat.send": "Kirim",
   "chat.sendFailed": "Pesan gagal terkirim",
+  "chat.loadOlder": "Muat pesan lama",
+  "chat.loadOlderFailed": "Pesan lama tidak dapat dimuat",
   "chat.resend": "Kirim ulang",
   "chat.today": "Hari ini",
   "chat.yesterday": "Kemarin",

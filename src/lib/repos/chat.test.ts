@@ -55,6 +55,10 @@ const firestore = vi.hoisted(() => {
     where(field: string, _op: string, value: unknown) {
       return new TestQuery(this.path).where(field, _op, value);
     }
+
+    orderBy(field: unknown, direction: "asc" | "desc") {
+      return new TestQuery(this.path).orderBy(field, direction);
+    }
   }
 
   class TestQuery {
@@ -233,6 +237,7 @@ vi.mock("../firebase/admin", () => ({ adminDb: () => firestore.db }));
 
 const {
   countUnreadForUser,
+  getMessages,
   listConversationsForUser,
   markConversationRead,
   sendMessage,
@@ -364,5 +369,34 @@ describe("listConversationsForUser", () => {
     expect(
       second.items.some(({ id }) => first.items.some((item) => item.id === id)),
     ).toBe(false);
+  });
+});
+
+describe("getMessages", () => {
+  function message(id: string, createdAt: string) {
+    firestore.docs.set(`conversations/${CONVERSATION}/messages/${id}`, {
+      conversationId: CONVERSATION,
+      senderId: SENDER,
+      body: id,
+      createdAt,
+      readAt: null,
+    });
+  }
+
+  it("pages newest-first and uses document ID for equal timestamps", async () => {
+    const sameTime = "2026-04-01T00:00:00.000Z";
+    for (let i = 0; i < 52; i++)
+      message(`message-${String(i).padStart(2, "0")}`, sameTime);
+
+    const first = await getMessages(CONVERSATION);
+    const second = await getMessages(CONVERSATION, first.nextCursor);
+
+    expect(first.items).toHaveLength(50);
+    expect(first.items[0].id).toBe("message-51");
+    expect(first.items.at(-1)?.id).toBe("message-02");
+    expect(second.items.map(({ id }) => id)).toEqual([
+      "message-01",
+      "message-00",
+    ]);
   });
 });

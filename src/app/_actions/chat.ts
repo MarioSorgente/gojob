@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimit";
 import {
   getConversation,
+  getMessages,
   markConversationRead,
   proposeInterview,
   respondToInterview,
@@ -49,6 +50,15 @@ export async function markReadAction(conversationId: string) {
   const user = await requireUser();
   await assertParticipant(conversationId, user.uid);
   await markConversationRead(conversationId, user.uid);
+}
+
+export async function loadOlderMessagesAction(
+  conversationId: string,
+  cursor: string,
+) {
+  const user = await requireUser();
+  await assertParticipant(conversationId, user.uid);
+  return getMessages(conversationId, cursor);
 }
 
 export async function proposeInterviewAction(
