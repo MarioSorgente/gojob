@@ -2,11 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { getBusinessByOwner } from "@/lib/repos/businesses";
-import { createAndPublishJob, generateShortlist, getJob } from "@/lib/repos/jobs";
+import { createAndPublishJob, getJob } from "@/lib/repos/jobs";
 import {
   ensureShortlistEntry,
   markHired,
@@ -38,20 +37,6 @@ export async function createJobAction(input: JobInput) {
     languages: input.languages,
     desiredStartDate: input.desiredStartDate,
     description: input.description,
-  });
-
-  // Scoring the pool is unbounded work — it grows with the candidate base, not
-  // with this request. Run it after the response so publishing stays fast; the
-  // job carries shortlistStatus: "pending" until it completes, and the job page
-  // polls for readiness.
-  after(async () => {
-    try {
-      await generateShortlist(job);
-    } catch (error) {
-      // generateShortlist already marked the job failed; nothing is awaiting
-      // this, so log rather than rethrow into a dead promise.
-      console.error(`Shortlist generation failed for job ${job.id}`, error);
-    }
   });
 
   redirect(`/employer/jobs/${job.id}?published=1`);

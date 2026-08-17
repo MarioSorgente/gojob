@@ -19,10 +19,7 @@ import type {
 export type UserRole = "candidate" | "employer" | "admin";
 
 export type VerificationStatus =
-  | "not_submitted"
-  | "pending"
-  | "verified"
-  | "rejected";
+  "not_submitted" | "pending" | "verified" | "rejected";
 
 /** Employer-side action on a candidate within a job's shortlist. */
 export type EmployerAction = "none" | "passed" | "saved" | "invited";
@@ -109,6 +106,9 @@ export interface CandidateProfile {
   idDocumentPath?: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Set by the projection worker after a complete recommendation refresh. */
+  recommendationsVersion?: string;
+  recommendationsUpdatedAt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -194,6 +194,18 @@ export interface MatchBreakdown {
   location: number;
   availability: number;
   profileStrength: number;
+}
+
+/** Stored at candidates/{candidateId}/recommendations/{jobId}. */
+export interface JobRecommendationProjection {
+  jobId: string;
+  score: number;
+  breakdown: MatchBreakdown;
+  reasons: string[];
+  rankingVersion: string;
+  scoredAt: string;
+  /** Denormalized for diagnostics and future secondary ordering. */
+  jobCreatedAt: string;
 }
 
 /** Compact candidate fields denormalized onto shortlist docs for fast cards. */

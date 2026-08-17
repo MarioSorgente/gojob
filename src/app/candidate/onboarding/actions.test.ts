@@ -5,8 +5,6 @@ const mocks = vi.hoisted(() => ({
   upsertCandidate: vi.fn(),
   setCandidateVerification: vi.fn(),
   markOnboardingComplete: vi.fn(),
-  resync: vi.fn(),
-  after: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`NEXT_REDIRECT:${path}`);
   }),
@@ -20,10 +18,6 @@ vi.mock("@/lib/repos/candidates", () => ({
 vi.mock("@/lib/repos/users", () => ({
   markOnboardingComplete: mocks.markOnboardingComplete,
 }));
-vi.mock("@/lib/repos/rematch", () => ({
-  resyncCandidateShortlistsQuietly: mocks.resync,
-}));
-vi.mock("next/server", () => ({ after: mocks.after }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 
 import { saveCandidateProfile } from "./actions";

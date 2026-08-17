@@ -1,11 +1,18 @@
 import "server-only";
+import { createHash, randomUUID } from "node:crypto";
 import { adminDb } from "../firebase/admin";
 import { COLLECTIONS } from "../collections";
 import { chunk } from "../chunk";
 import { withIndexFallback } from "../firestoreErrors";
 import { computeMatch } from "../matching";
 import { jobMatchesFilters, type JobFilters } from "../search";
-import { PAGE_SIZE, paginateArray, type Page } from "../pagination";
+import {
+  PAGE_SIZE,
+  decodeCursor,
+  encodeCursor,
+  type Page,
+} from "../pagination";
+import { enqueueJobRecommendations } from "../recommendationTasks";
 import {
   listCandidatesForRole,
   listAllCandidates,
@@ -16,6 +23,7 @@ import type {
   Job,
   JobCandidate,
   MatchBreakdown,
+  JobRecommendationProjection,
   ShortlistStatus,
 } from "../types";
 
@@ -90,6 +98,7 @@ export async function createJob(input: NewJobInput): Promise<Job> {
     matchCount: input.matchCount ?? 0,
   };
   await ref.set(job);
+  if (job.status === "live") await enqueueJobRecommendations(ref.id);
   return { id: ref.id, ...job };
 }
 
@@ -171,10 +180,9 @@ async function setShortlistStatus(
 /**
  * Create a live job without scoring the pool.
  *
- * Generation is the caller's job (see createJobAction, which hands it to
- * `after()`): it is unbounded work, and doing it inline made publishing a job
- * take as long as the candidate pool was large. The job is marked `pending` so
- * the UI can show progress rather than an empty list.
+ * createJob durably enqueues generation: it is unbounded work, and doing it
+ * inline made publishing take as long as the candidate pool was large. The job
+ * is marked `pending` so the UI can show progress rather than an empty list.
  */
 export async function createAndPublishJob(
   input: NewJobInput,
@@ -192,6 +200,106 @@ export interface JobRecommendation {
   score: number;
   breakdown: MatchBreakdown;
   reasons: string[];
+}
+
+interface RecommendationCursor {
+  v: 1;
+  mode: "projection";
+  score: number;
+  jobId: string;
+}
+
+interface WindowCursor {
+  v: 1;
+  mode: "window";
+  windowId: string;
+  offset: number;
+}
+
+interface WindowEntry {
+  jobId: string;
+  score: number;
+  breakdown: MatchBreakdown;
+  reasons: string[];
+}
+
+interface RecommendationWindow {
+  candidateId: string;
+  filterHash: string;
+  expiresAt: string;
+  entries: WindowEntry[];
+}
+
+const filterHash = (filters: JobFilters) =>
+  createHash("sha256").update(JSON.stringify(filters)).digest("hex");
+
+async function hydrateRecommendations(entries: WindowEntry[]) {
+  if (!entries.length) return [];
+  const refs = entries.map((entry) => col().doc(entry.jobId));
+  const docs = await adminDb().getAll(...refs);
+  const jobs = new Map(
+    docs
+      .filter((doc) => doc.exists)
+      .map((doc) => [
+        doc.id,
+        { id: doc.id, ...(doc.data() as Omit<Job, "id">) },
+      ]),
+  );
+  return entries.flatMap((entry) => {
+    const job = jobs.get(entry.jobId);
+    return job?.status === "live" ? [{ job, ...entry }] : [];
+  });
+}
+
+async function fallbackRecommendationsPage(
+  candidate: CandidateProfile,
+  filters: JobFilters,
+  cursor: WindowCursor | null,
+  pageSize: number,
+): Promise<Page<JobRecommendation>> {
+  const windows = adminDb().collection(COLLECTIONS.recommendationWindows);
+  let windowId = cursor?.windowId;
+  let offset = cursor?.offset ?? 0;
+  let window: RecommendationWindow | undefined;
+  if (windowId) {
+    const snap = await windows.doc(windowId).get();
+    window = snap.data() as RecommendationWindow | undefined;
+    if (
+      window?.candidateId !== candidate.userId ||
+      window.filterHash !== filterHash(filters) ||
+      Date.parse(window.expiresAt) <= Date.now()
+    ) {
+      window = undefined;
+      windowId = undefined;
+      offset = 0;
+    }
+  }
+  if (!window) {
+    const ranked = await searchJobsForCandidate(candidate, filters);
+    windowId = randomUUID();
+    window = {
+      candidateId: candidate.userId,
+      filterHash: filterHash(filters),
+      expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+      entries: ranked.map(({ job, ...match }) => ({ jobId: job.id, ...match })),
+    };
+    await windows.doc(windowId).set(window);
+  }
+  const entries = window.entries.slice(offset, offset + pageSize);
+  const items = await hydrateRecommendations(entries);
+  const next = offset + entries.length;
+  return {
+    items,
+    nextCursor:
+      next < window.entries.length
+        ? encodeCursor<WindowCursor>({
+            v: 1,
+            mode: "window",
+            windowId: windowId!,
+            offset: next,
+          })
+        : null,
+  };
 }
 
 /**
@@ -212,10 +320,10 @@ export async function searchJobsForCandidate(
 /**
  * One page of ranked recommendations.
  *
- * Ranking has to span the whole window before it can be sliced — the
- * best-matching job is rarely the newest — so this pages the ranked array
- * rather than the query. Reads stay bounded by MAX_RANKED_JOBS; only rendering
- * is paginated.
+ * Deployed candidates page their materialized ranking by score and job ID,
+ * reading only one look-ahead row. Candidates not yet backfilled use a
+ * short-lived server-side ranked window so subsequent pages do not repeat the
+ * bounded legacy scan.
  */
 export async function recommendedJobsPage(
   candidate: CandidateProfile,
@@ -223,8 +331,75 @@ export async function recommendedJobsPage(
   cursor: string | null,
   pageSize = PAGE_SIZE,
 ): Promise<Page<JobRecommendation>> {
-  const ranked = await searchJobsForCandidate(candidate, filters);
-  return paginateArray(ranked, cursor, pageSize);
+  const started = performance.now();
+  let documentsRead = 0;
+  let rankingAgeMs: number | null = null;
+  let result: Page<JobRecommendation> = { items: [], nextCursor: null };
+  try {
+    const decoded = decodeCursor<RecommendationCursor | WindowCursor>(cursor);
+    if (
+      candidate.recommendationsVersion !== "match-v1" ||
+      decoded?.mode === "window"
+    ) {
+      result = await fallbackRecommendationsPage(
+        candidate,
+        filters,
+        decoded?.mode === "window" ? decoded : null,
+        pageSize,
+      );
+      // One window read after page one, plus only the hydrated jobs. The first
+      // page's bounded legacy scan is intentionally visible in this metric.
+      documentsRead = result.items.length + (cursor ? 1 : MAX_RANKED_JOBS);
+      return result;
+    }
+
+    let query = adminDb()
+      .collection(COLLECTIONS.candidates)
+      .doc(candidate.userId)
+      .collection(COLLECTIONS.recommendations)
+      .orderBy("score", "desc")
+      .orderBy("jobId", "asc");
+    if (decoded?.mode === "projection") {
+      query = query.startAfter(decoded.score, decoded.jobId);
+    }
+    const snap = await query.limit(pageSize + 1).get();
+    documentsRead += snap.size;
+    const rows = snap.docs.map(
+      (doc) => doc.data() as JobRecommendationProjection,
+    );
+    const pageRows = rows.slice(0, pageSize);
+    const hydrated = await hydrateRecommendations(pageRows);
+    documentsRead += pageRows.length;
+    result = {
+      items: hydrated.filter(({ job }) => jobMatchesFilters(job, filters)),
+      nextCursor:
+        rows.length > pageSize && pageRows.length
+          ? encodeCursor<RecommendationCursor>({
+              v: 1,
+              mode: "projection",
+              score: pageRows[pageRows.length - 1].score,
+              jobId: pageRows[pageRows.length - 1].jobId,
+            })
+          : null,
+    };
+    rankingAgeMs = candidate.recommendationsUpdatedAt
+      ? Date.now() - Date.parse(candidate.recommendationsUpdatedAt)
+      : null;
+    return result;
+  } finally {
+    console.info(
+      JSON.stringify({
+        event: "recommendations_read",
+        documentsRead,
+        resultsReturned: result.items.length,
+        documentsReadPerResult: result.items.length
+          ? Number((documentsRead / result.items.length).toFixed(2))
+          : documentsRead,
+        rankingAgeMs,
+        latencyMs: Math.round(performance.now() - started),
+      }),
+    );
+  }
 }
 
 /** Score a single job against a candidate (job detail page). */
