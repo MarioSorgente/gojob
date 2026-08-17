@@ -26,6 +26,14 @@ export default function CandidateError({
       <PageTitle title={t("error.title")} subtitle={t("error.hint")} />
       <Alert tone="danger" className="mb-4">
         {t("common.somethingWentWrong")}
+        {/* The digest is the only handle on the server-side stack, which Next
+            withholds from the browser. Showing it means a screenshot is enough
+            to find the failure in the server log. */}
+        {error.digest ? (
+          <span className="mt-1 block font-mono text-xs opacity-80">
+            {error.digest}
+          </span>
+        ) : null}
       </Alert>
       <Button onClick={reset}>{t("error.reload")}</Button>
     </>
