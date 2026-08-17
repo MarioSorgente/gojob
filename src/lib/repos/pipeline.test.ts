@@ -224,6 +224,12 @@ describe("candidateApply", () => {
     };
     expect(conversation.participants).toEqual([EMPLOYER, CANDIDATE]);
     expect(conversation.unread).toEqual({ [EMPLOYER]: 0, [CANDIDATE]: 0 });
+    expect(db.docs.get(`userStats/${EMPLOYER}`)).toEqual({
+      unreadConversationMessages: 0,
+    });
+    expect(db.docs.get(`userStats/${CANDIDATE}`)).toEqual({
+      unreadConversationMessages: 0,
+    });
     expect(db.dump("matches")).toHaveLength(1);
   });
 

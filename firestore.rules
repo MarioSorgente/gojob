@@ -19,6 +19,12 @@ service cloud.firestore {
       allow read: if signedIn() && request.auth.uid == uid;
     }
 
+    // Notification summaries are durable user data (not TTL candidates).
+    match /userStats/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
     // A candidate can read their own profile. Employers view candidates via the
     // server, so no broad client read here.
     match /candidates/{uid} {

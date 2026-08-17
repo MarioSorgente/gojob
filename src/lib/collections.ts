@@ -8,6 +8,8 @@ export const COLLECTIONS = {
   shortlist: "shortlist",
   matches: "matches",
   conversations: "conversations",
+  /** Per-user notification counters, keyed by the user's uid. */
+  userStats: "userStats",
   /** Subcollection of a conversation. */
   messages: "messages",
   interviews: "interviews",
