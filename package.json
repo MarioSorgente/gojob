@@ -18,6 +18,8 @@
     "migrate:conversation-activity:prod": "tsx scripts/backfill-conversation-activity.ts --prod",
     "migrate:unread-stats": "tsx scripts/backfill-unread-conversation-stats.ts",
     "migrate:unread-stats:prod": "tsx scripts/backfill-unread-conversation-stats.ts --prod",
+    "migrate:job-counts": "tsx scripts/backfill-job-counts.ts",
+    "migrate:job-counts:prod": "tsx scripts/backfill-job-counts.ts --prod",
     "format": "prettier --write .",
     "design:audit": "tsx scripts/design-audit.mjs",
     "e2e": "playwright test",
