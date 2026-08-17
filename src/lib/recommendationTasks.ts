@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { adminDb } from "./firebase/admin";
 import { COLLECTIONS } from "./collections";
+import { dispatchRecommendationWorker } from "./recommendationDispatch";
 import type { CandidateProfile } from "./types";
 
 /** A stable digest of only fields consumed by computeMatch. */
@@ -41,6 +42,18 @@ async function enqueue(kind: "candidate" | "job", entityId: string) {
       },
       { merge: true },
     );
+
+  // The Firestore write above is the durable handoff. A dispatch outage must
+  // not make the candidate/job mutation fail; the daily cron retains recovery.
+  await dispatchRecommendationWorker().catch((error) => {
+    console.error(
+      JSON.stringify({
+        event: "recommendation_dispatch_failure",
+        kind,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  });
 }
 
 export const enqueueCandidateRecommendations = (candidateId: string) =>

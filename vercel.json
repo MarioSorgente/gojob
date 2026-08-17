@@ -4,7 +4,7 @@
   "crons": [
     {
       "path": "/api/cron/recommendations",
-      "schedule": "* * * * *"
+      "schedule": "5 18 * * *"
     },
     {
       "path": "/api/cron/rescore",
