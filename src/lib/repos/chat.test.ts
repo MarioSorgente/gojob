@@ -7,6 +7,23 @@ const firestore = vi.hoisted(() => {
   const batches: TestBatch[] = [];
   let failCommit = false;
   let nextMessage = 0;
+  let transactionTail = Promise.resolve();
+
+  const merge = (base: Data, patch: Data): Data => {
+    const result = { ...base };
+    for (const [key, value] of Object.entries(patch)) {
+      result[key] =
+        value &&
+        typeof value === "object" &&
+        !Array.isArray(value) &&
+        result[key] &&
+        typeof result[key] === "object" &&
+        !Array.isArray(result[key])
+          ? merge(result[key] as Data, value as Data)
+          : value;
+    }
+    return result;
+  };
 
   class TestDoc {
     constructor(readonly path: string) {}
@@ -148,6 +165,31 @@ const firestore = vi.hoisted(() => {
     }
   }
 
+  class TestTransaction {
+    readonly writes: { ref: TestDoc; data: Data; merge: boolean }[] = [];
+
+    get(ref: TestDoc) {
+      return ref.get();
+    }
+
+    set(ref: TestDoc, data: Data, options?: { merge?: boolean }) {
+      this.writes.push({ ref, data, merge: options?.merge === true });
+      return this;
+    }
+
+    commit() {
+      if (failCommit) throw new Error("parent update rejected");
+      for (const write of this.writes) {
+        docs.set(
+          write.ref.path,
+          write.merge
+            ? merge(docs.get(write.ref.path) ?? {}, write.data)
+            : write.data,
+        );
+      }
+    }
+  }
+
   return {
     docs,
     batches,
@@ -167,13 +209,34 @@ const firestore = vi.hoisted(() => {
         batches.push(batch);
         return batch;
       },
+      runTransaction: async <T>(
+        callback: (tx: TestTransaction) => Promise<T>,
+      ) => {
+        const previous = transactionTail;
+        let release!: () => void;
+        transactionTail = new Promise<void>((resolve) => (release = resolve));
+        await previous;
+        try {
+          const tx = new TestTransaction();
+          const result = await callback(tx);
+          tx.commit();
+          return result;
+        } finally {
+          release();
+        }
+      },
     },
   };
 });
 
 vi.mock("../firebase/admin", () => ({ adminDb: () => firestore.db }));
 
-const { listConversationsForUser, sendMessage } = await import("./chat");
+const {
+  countUnreadForUser,
+  listConversationsForUser,
+  markConversationRead,
+  sendMessage,
+} = await import("./chat");
 
 const CONVERSATION = "conversation-1";
 const SENDER = "candidate-1";
@@ -187,32 +250,25 @@ beforeEach(() => {
     createdAt: "2026-01-01T00:00:00.000Z",
     activityAt: "2026-01-01T00:00:00.000Z",
   });
+  firestore.docs.set(`userStats/${SENDER}`, { unreadConversationMessages: 2 });
+  firestore.docs.set(`userStats/${RECIPIENT}`, {
+    unreadConversationMessages: 3,
+  });
 });
 
 describe("sendMessage", () => {
-  it("commits the message and conversation changes as one atomic batch", async () => {
+  it("atomically writes the message and both unread counters", async () => {
     const result = await sendMessage(CONVERSATION, SENDER, "  Hello there  ");
 
     expect(result.body).toBe("Hello there");
-    expect(firestore.batches).toHaveLength(1);
-    expect(firestore.batches[0].commit).toHaveBeenCalledOnce();
-    expect(firestore.batches[0].writes).toHaveLength(2);
-    expect(
-      firestore.batches[0].writes.map(({ kind, ref }) => [kind, ref.path]),
-    ).toEqual([
-      ["set", `conversations/${CONVERSATION}/messages/${result.id}`],
-      ["update", `conversations/${CONVERSATION}`],
-    ]);
-
-    const parentUpdate = firestore.batches[0].writes[1].data;
+    const parentUpdate = firestore.docs.get(`conversations/${CONVERSATION}`)!;
     expect(parentUpdate).toMatchObject({
       lastMessage: "Hello there",
       lastMessageAt: result.createdAt,
       activityAt: result.createdAt,
     });
-    expect(
-      Object.keys(parentUpdate).filter((key) => key.startsWith("unread.")),
-    ).toEqual([`unread.${RECIPIENT}`]);
+    expect((parentUpdate.unread as Data)[RECIPIENT]).toBe(4);
+    expect(await countUnreadForUser(RECIPIENT)).toBe(4);
   });
 
   it("does not leave a message when the conversation update cannot commit", async () => {
@@ -222,10 +278,20 @@ describe("sendMessage", () => {
       "parent update rejected",
     );
 
-    expect(firestore.batches[0].commit).toHaveBeenCalledOnce();
     expect(
       [...firestore.docs.keys()].filter((path) => path.includes("/messages/")),
     ).toEqual([]);
+  });
+
+  it("does not lose increments from concurrent sends", async () => {
+    await Promise.all([
+      sendMessage(CONVERSATION, SENDER, "One"),
+      sendMessage(CONVERSATION, SENDER, "Two"),
+      sendMessage(CONVERSATION, SENDER, "Three"),
+    ]);
+    expect(await countUnreadForUser(RECIPIENT)).toBe(6);
+    const conversation = firestore.docs.get(`conversations/${CONVERSATION}`)!;
+    expect((conversation.unread as Data)[RECIPIENT]).toBe(6);
   });
 
   it("rejects a blank body before creating a batch", async () => {
@@ -233,6 +299,25 @@ describe("sendMessage", () => {
       "Message body is required",
     );
     expect(firestore.batches).toHaveLength(0);
+  });
+});
+
+describe("markConversationRead", () => {
+  it("subtracts the prior conversation count only once", async () => {
+    await markConversationRead(CONVERSATION, RECIPIENT);
+    await markConversationRead(CONVERSATION, RECIPIENT);
+    expect(await countUnreadForUser(RECIPIENT)).toBe(0);
+  });
+
+  it("never produces a negative summary, including concurrent reads", async () => {
+    firestore.docs.set(`userStats/${RECIPIENT}`, {
+      unreadConversationMessages: 1,
+    });
+    await Promise.all([
+      markConversationRead(CONVERSATION, RECIPIENT),
+      markConversationRead(CONVERSATION, RECIPIENT),
+    ]);
+    expect(await countUnreadForUser(RECIPIENT)).toBe(0);
   });
 });
 

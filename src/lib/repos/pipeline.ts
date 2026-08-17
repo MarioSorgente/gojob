@@ -222,7 +222,8 @@ export async function listCandidateActions(
   const entries = await candidateEntries(candidateId);
   const out: Record<string, CandidateAction> = {};
   for (const entry of entries) {
-    if (entry.candidateAction !== "none") out[entry.jobId] = entry.candidateAction;
+    if (entry.candidateAction !== "none")
+      out[entry.jobId] = entry.candidateAction;
   }
   return out;
 }
@@ -277,6 +278,12 @@ async function createMatch(
   const rowRef = shortlistDoc(job.id, candidateId);
   const matchRef = db.collection(COLLECTIONS.matches).doc(matchId);
   const convRef = db.collection(COLLECTIONS.conversations).doc(conversationId);
+  const employerStatsRef = db
+    .collection(COLLECTIONS.userStats)
+    .doc(job.ownerId);
+  const candidateStatsRef = db
+    .collection(COLLECTIONS.userStats)
+    .doc(candidateId);
 
   return db.runTransaction(async (transaction) => {
     const rowSnap = await transaction.get(rowRef);
@@ -295,6 +302,11 @@ async function createMatch(
     ) {
       return null;
     }
+
+    const [employerStats, candidateStats] = await Promise.all([
+      transaction.get(employerStatsRef),
+      transaction.get(candidateStatsRef),
+    ]);
 
     const now = new Date().toISOString();
     const participants = [job.ownerId, candidateId];
@@ -325,6 +337,12 @@ async function createMatch(
 
     transaction.set(matchRef, match);
     transaction.set(convRef, conversation);
+    if (!employerStats.exists) {
+      transaction.set(employerStatsRef, { unreadConversationMessages: 0 });
+    }
+    if (!candidateStats.exists) {
+      transaction.set(candidateStatsRef, { unreadConversationMessages: 0 });
+    }
     transaction.set(
       rowRef,
       { stage: "matched", matchId, conversationId, updatedAt: now },

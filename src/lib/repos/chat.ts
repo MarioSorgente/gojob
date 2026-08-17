@@ -1,5 +1,5 @@
 import "server-only";
-import { FieldPath, FieldValue } from "firebase-admin/firestore";
+import { FieldPath } from "firebase-admin/firestore";
 import { adminDb } from "../firebase/admin";
 import { COLLECTIONS } from "../collections";
 import type { Conversation, Interview, Message } from "../types";
@@ -14,6 +14,14 @@ const conversationsCol = () => adminDb().collection(COLLECTIONS.conversations);
 const messagesCol = (conversationId: string) =>
   conversationsCol().doc(conversationId).collection(COLLECTIONS.messages);
 const interviewsCol = () => adminDb().collection(COLLECTIONS.interviews);
+const userStatsDoc = (uid: string) =>
+  adminDb().collection(COLLECTIONS.userStats).doc(uid);
+
+function nonNegativeCount(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.floor(value))
+    : 0;
+}
 
 export async function getConversation(
   id: string,
@@ -62,27 +70,10 @@ export async function listConversationsForUser(
   };
 }
 
-/**
- * Total unread messages across a user's conversations, for the nav badge.
- *
- * Unread counts live in a map keyed by uid (`unread.{uid}`), so Firestore can't
- * sum them — an aggregation query can count documents but not add up a field,
- * and a per-user field path can't be indexed. The read is unavoidable; what this
- * avoids is the object construction and sort that listConversationsForUser does
- * on every single page render just to produce one number.
- */
+/** Total unread conversation messages, served by one summary-document read. */
 export async function countUnreadForUser(uid: string): Promise<number> {
-  const snap = await conversationsCol()
-    .where("participants", "array-contains", uid)
-    .select(`unread.${uid}`)
-    .get();
-
-  return snap.docs.reduce((total, doc) => {
-    const value = (doc.data() as { unread?: Record<string, number> }).unread?.[
-      uid
-    ];
-    return total + (typeof value === "number" ? value : 0);
-  }, 0);
+  const snap = await userStatsDoc(uid).get();
+  return nonNegativeCount(snap.data()?.unreadConversationMessages);
 }
 
 export async function getMessages(conversationId: string): Promise<Message[]> {
@@ -105,12 +96,6 @@ export async function sendMessage(
   senderId: string,
   body: string,
 ): Promise<Message> {
-  const conv = await getConversation(conversationId);
-  if (!conv) throw new Error("Conversation not found");
-  if (!conv.participants.includes(senderId)) {
-    throw new Error("Not a participant");
-  }
-
   const trimmedBody = body.trim();
   if (!trimmedBody) throw new Error("Message body is required");
 
@@ -124,18 +109,43 @@ export async function sendMessage(
     readAt: null,
   };
 
-  const recipient = conv.participants.find((p) => p !== senderId);
-  const update: Record<string, unknown> = {
-    lastMessage: message.body.slice(0, 140),
-    lastMessageAt: now,
-    activityAt: now,
-  };
-  if (recipient) update[`unread.${recipient}`] = FieldValue.increment(1);
+  const conversationRef = conversationsCol().doc(conversationId);
+  await adminDb().runTransaction(async (transaction) => {
+    const convSnap = await transaction.get(conversationRef);
+    if (!convSnap.exists) throw new Error("Conversation not found");
+    const conv = convSnap.data() as Omit<Conversation, "id">;
+    if (!conv.participants.includes(senderId))
+      throw new Error("Not a participant");
 
-  const batch = adminDb().batch();
-  batch.set(ref, message);
-  batch.update(conversationsCol().doc(conversationId), update);
-  await batch.commit();
+    const recipient = conv.participants.find(
+      (participant) => participant !== senderId,
+    );
+    const statsRef = recipient ? userStatsDoc(recipient) : null;
+    const statsSnap = statsRef ? await transaction.get(statsRef) : null;
+    const unread = { ...(conv.unread ?? {}) };
+
+    if (recipient && statsRef) {
+      unread[recipient] = nonNegativeCount(unread[recipient]) + 1;
+      const total =
+        nonNegativeCount(statsSnap?.data()?.unreadConversationMessages) + 1;
+      transaction.set(
+        statsRef,
+        { unreadConversationMessages: total },
+        { merge: true },
+      );
+    }
+    transaction.set(ref, message);
+    transaction.set(
+      conversationRef,
+      {
+        lastMessage: message.body.slice(0, 140),
+        lastMessageAt: now,
+        activityAt: now,
+        unread,
+      },
+      { merge: true },
+    );
+  });
 
   return { id: ref.id, ...message };
 }
@@ -144,9 +154,32 @@ export async function markConversationRead(
   conversationId: string,
   uid: string,
 ): Promise<void> {
-  await conversationsCol()
-    .doc(conversationId)
-    .set({ unread: { [uid]: 0 } }, { merge: true });
+  const conversationRef = conversationsCol().doc(conversationId);
+  const statsRef = userStatsDoc(uid);
+  await adminDb().runTransaction(async (transaction) => {
+    const [convSnap, statsSnap] = await Promise.all([
+      transaction.get(conversationRef),
+      transaction.get(statsRef),
+    ]);
+    if (!convSnap.exists) throw new Error("Conversation not found");
+    const conv = convSnap.data() as Omit<Conversation, "id">;
+    if (!conv.participants.includes(uid)) throw new Error("Not a participant");
+
+    const priorUnread = nonNegativeCount(conv.unread?.[uid]);
+    const total = nonNegativeCount(
+      statsSnap.data()?.unreadConversationMessages,
+    );
+    transaction.set(
+      conversationRef,
+      { unread: { ...conv.unread, [uid]: 0 } },
+      { merge: true },
+    );
+    transaction.set(
+      statsRef,
+      { unreadConversationMessages: Math.max(0, total - priorUnread) },
+      { merge: true },
+    );
+  });
 }
 
 // ---------------------------------------------------------------------------

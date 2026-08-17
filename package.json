@@ -16,6 +16,8 @@
     "seed:prod": "tsx scripts/seed.ts --prod",
     "migrate:conversation-activity": "tsx scripts/backfill-conversation-activity.ts",
     "migrate:conversation-activity:prod": "tsx scripts/backfill-conversation-activity.ts --prod",
+    "migrate:unread-stats": "tsx scripts/backfill-unread-conversation-stats.ts",
+    "migrate:unread-stats:prod": "tsx scripts/backfill-unread-conversation-stats.ts --prod",
     "format": "prettier --write .",
     "design:audit": "tsx scripts/design-audit.mjs",
     "e2e": "playwright test",
