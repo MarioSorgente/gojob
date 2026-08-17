@@ -84,10 +84,10 @@ export default async function FindCandidatesPage({
       options: options(ROLES, locale, roleLabel),
     },
     areaField,
-    { name: "minExp", label: t("candidate.experience"), type: "number", placeholder: "2" },
+    { name: "minExp", label: t("filter.minExperience"), type: "number", placeholder: "2" },
     {
       name: "maxSalary",
-      label: t("candidate.expectedSalary"),
+      label: t("filter.maxSalary"),
       type: "number",
       placeholder: "8000000",
     },
@@ -111,11 +111,11 @@ export default async function FindCandidatesPage({
     },
     {
       name: "level",
-      label: t("candidate.verification"),
+      label: t("filter.minLanguageLevel"),
       type: "select",
       options: options(PROFICIENCY_LEVELS, locale, proficiencyLabel),
     },
-    { name: "verified", label: t("common.verified"), type: "checkbox" },
+    { name: "verified", label: t("filter.idVerifiedOnly"), type: "checkbox" },
   ];
 
   return (
