@@ -34,7 +34,10 @@ export async function getJob(id: string): Promise<Job | null> {
 
 export async function listJobsByBusiness(businessId: string): Promise<Job[]> {
   const snap = await col().where("businessId", "==", businessId).get();
-  const jobs = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Job, "id">) }));
+  const jobs = snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<Job, "id">),
+  }));
   return jobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
@@ -82,6 +85,9 @@ export async function createJob(input: NewJobInput): Promise<Job> {
     ...input,
     status: input.status ?? "live",
     createdAt: new Date().toISOString(),
+    shortlistCount: input.shortlistCount ?? 0,
+    applicationCount: input.applicationCount ?? 0,
+    matchCount: input.matchCount ?? 0,
   };
   await ref.set(job);
   return { id: ref.id, ...job };

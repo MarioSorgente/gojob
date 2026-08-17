@@ -27,6 +27,60 @@ const jobsCol = () => adminDb().collection(COLLECTIONS.jobs);
 const shortlistDoc = (jobId: string, candidateId: string) =>
   jobsCol().doc(jobId).collection(COLLECTIONS.shortlist).doc(candidateId);
 
+const isApplication = (entry: Partial<JobCandidate>) =>
+  entry.candidateAction === "applied";
+const isMatch = (entry: Partial<JobCandidate>) =>
+  entry.stage === "matched" ||
+  entry.stage === "interview" ||
+  entry.stage === "hired";
+
+function count(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.floor(value))
+    : 0;
+}
+
+/** Atomically change a row and its denormalized job counters. */
+async function transitionShortlistEntry(
+  jobId: string,
+  candidateId: string,
+  transition: (entry: JobCandidate) => Partial<JobCandidate>,
+): Promise<JobCandidate> {
+  const db = adminDb();
+  const rowRef = shortlistDoc(jobId, candidateId);
+  const jobRef = jobsCol().doc(jobId);
+  return db.runTransaction(async (transaction) => {
+    const [rowSnap, jobSnap] = await Promise.all([
+      transaction.get(rowRef),
+      transaction.get(jobRef),
+    ]);
+    if (!rowSnap.exists) throw new Error("Shortlist entry not found");
+    if (!jobSnap.exists) throw new Error("Job not found");
+    const before = rowSnap.data() as JobCandidate;
+    const patch = transition(before);
+    const after = { ...before, ...patch };
+    const applicationDelta =
+      Number(isApplication(after)) - Number(isApplication(before));
+    const matchDelta = Number(isMatch(after)) - Number(isMatch(before));
+    transaction.set(rowRef, patch, { merge: true });
+    if (applicationDelta || matchDelta) {
+      const job = jobSnap.data() as Partial<Job>;
+      transaction.set(
+        jobRef,
+        {
+          applicationCount: Math.max(
+            0,
+            count(job.applicationCount) + applicationDelta,
+          ),
+          matchCount: Math.max(0, count(job.matchCount) + matchDelta),
+        },
+        { merge: true },
+      );
+    }
+    return after;
+  });
+}
+
 function relationshipId(jobId: string, candidateId: string): string {
   const relationship = `${jobId.length}:${jobId}${candidateId.length}:${candidateId}`;
   return createHash("sha256").update(relationship).digest("hex");
@@ -276,6 +330,7 @@ async function createMatch(
   const conversationId = `conversation_${id}`;
   const db = adminDb();
   const rowRef = shortlistDoc(job.id, candidateId);
+  const jobRef = jobsCol().doc(job.id);
   const matchRef = db.collection(COLLECTIONS.matches).doc(matchId);
   const convRef = db.collection(COLLECTIONS.conversations).doc(conversationId);
   const employerStatsRef = db
@@ -286,8 +341,12 @@ async function createMatch(
     .doc(candidateId);
 
   return db.runTransaction(async (transaction) => {
-    const rowSnap = await transaction.get(rowRef);
+    const [rowSnap, jobSnap] = await Promise.all([
+      transaction.get(rowRef),
+      transaction.get(jobRef),
+    ]);
     if (!rowSnap.exists) throw new Error("Shortlist entry not found");
+    if (!jobSnap.exists) throw new Error("Job not found");
     const entry = rowSnap.data() as JobCandidate;
 
     if (entry.matchId) {
@@ -348,6 +407,14 @@ async function createMatch(
       { stage: "matched", matchId, conversationId, updatedAt: now },
       { merge: true },
     );
+    if (!isMatch(entry)) {
+      const storedJob = jobSnap.data() as Partial<Job>;
+      transaction.set(
+        jobRef,
+        { matchCount: count(storedJob.matchCount) + 1 },
+        { merge: true },
+      );
+    }
     return { matchId, conversationId };
   });
 }
@@ -406,8 +473,25 @@ export async function ensureShortlistEntry(
     createdAt: now,
     updatedAt: now,
   };
-  await shortlistDoc(jobId, candidateId).set(entry);
-  return entry;
+  const db = adminDb();
+  const rowRef = shortlistDoc(jobId, candidateId);
+  const jobRef = jobsCol().doc(jobId);
+  return db.runTransaction(async (transaction) => {
+    const [rowSnap, jobSnap] = await Promise.all([
+      transaction.get(rowRef),
+      transaction.get(jobRef),
+    ]);
+    if (rowSnap.exists) return rowSnap.data() as JobCandidate;
+    if (!jobSnap.exists) throw new Error("Job not found");
+    const storedJob = jobSnap.data() as Partial<Job>;
+    transaction.set(rowRef, entry);
+    transaction.set(
+      jobRef,
+      { shortlistCount: count(storedJob.shortlistCount) + 1 },
+      { merge: true },
+    );
+    return entry;
+  });
 }
 
 /**
@@ -425,47 +509,43 @@ export async function setEmployerAction(
   candidateId: string,
   action: EmployerAction,
 ): Promise<ActionResult> {
-  const entry = await getJobCandidate(jobId, candidateId);
-  if (!entry) throw new Error("Shortlist entry not found");
   const now = new Date().toISOString();
 
   if (action === "none") {
-    await shortlistDoc(jobId, candidateId).set(
-      {
-        employerAction: "none",
-        // Only rewind the stage if this action is what set it to rejected;
-        // never resurrect a matched or hired pair.
-        ...(entry.stage === "rejected" && entry.candidateAction !== "passed"
-          ? { stage: "recommended" }
-          : {}),
-        updatedAt: now,
-      },
-      { merge: true },
-    );
+    await transitionShortlistEntry(jobId, candidateId, (entry) => ({
+      employerAction: "none",
+      // Only rewind the stage if this action is what set it to rejected;
+      // never resurrect a matched or hired pair.
+      ...(entry.stage === "rejected" && entry.candidateAction !== "passed"
+        ? { stage: "recommended" }
+        : {}),
+      updatedAt: now,
+    }));
     return { matched: false };
   }
 
   if (action === "passed") {
-    await shortlistDoc(jobId, candidateId).set(
-      { employerAction: "passed", stage: "rejected", updatedAt: now },
-      { merge: true },
-    );
+    await transitionShortlistEntry(jobId, candidateId, () => ({
+      employerAction: "passed",
+      stage: "rejected",
+      updatedAt: now,
+    }));
     return { matched: false };
   }
 
   if (action === "saved") {
-    await shortlistDoc(jobId, candidateId).set(
-      { employerAction: "saved", updatedAt: now },
-      { merge: true },
-    );
+    await transitionShortlistEntry(jobId, candidateId, () => ({
+      employerAction: "saved",
+      updatedAt: now,
+    }));
     return { matched: false };
   }
 
   // action === "invited"
-  await shortlistDoc(jobId, candidateId).set(
-    { employerAction: "invited", updatedAt: now },
-    { merge: true },
-  );
+  await transitionShortlistEntry(jobId, candidateId, () => ({
+    employerAction: "invited",
+    updatedAt: now,
+  }));
 
   // The transaction re-reads both actions; `entry` may already be stale when
   // an application and invitation arrive concurrently.
@@ -484,17 +564,14 @@ export async function candidateApply(
   // pool: they registered after the job was posted (the whole point of the
   // public share link, §20), or their desired roles don't include this one.
   // Score it on demand, exactly as the employer's invite-from-search does.
-  const entry = await ensureShortlistEntry(jobId, candidateId);
+  await ensureShortlistEntry(jobId, candidateId);
   const now = new Date().toISOString();
 
-  await shortlistDoc(jobId, candidateId).set(
-    {
-      candidateAction: "applied",
-      stage: entry.stage === "recommended" ? "applied" : entry.stage,
-      updatedAt: now,
-    },
-    { merge: true },
-  );
+  await transitionShortlistEntry(jobId, candidateId, (entry) => ({
+    candidateAction: "applied",
+    stage: entry.stage === "recommended" ? "applied" : entry.stage,
+    updatedAt: now,
+  }));
 
   // Decide mutual interest from the transaction's fresh row, not `entry`.
   const job = await getJob(jobId);
@@ -511,14 +588,11 @@ export async function candidatePass(
   // partial row with no jobId/score/candidateSummary, which then breaks the
   // applications list and the employer's shortlist rendering.
   await ensureShortlistEntry(jobId, candidateId);
-  await shortlistDoc(jobId, candidateId).set(
-    {
-      candidateAction: "passed",
-      stage: "rejected",
-      updatedAt: new Date().toISOString(),
-    },
-    { merge: true },
-  );
+  await transitionShortlistEntry(jobId, candidateId, () => ({
+    candidateAction: "passed",
+    stage: "rejected",
+    updatedAt: new Date().toISOString(),
+  }));
 }
 
 /** Candidate accepts (=apply/match) or declines an employer invitation. */

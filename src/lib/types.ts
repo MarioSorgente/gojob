@@ -32,12 +32,7 @@ export type CandidateAction = "none" | "applied" | "passed";
 
 /** Stage of a (job, candidate) pair in the hiring pipeline (scope §16). */
 export type PipelineStage =
-  | "recommended"
-  | "applied"
-  | "matched"
-  | "interview"
-  | "hired"
-  | "rejected";
+  "recommended" | "applied" | "matched" | "interview" | "hired" | "rejected";
 
 // ---------------------------------------------------------------------------
 // User & candidate
@@ -181,6 +176,9 @@ export interface Job {
   shortlistStatus?: ShortlistStatus;
   /** Size of the generated shortlist, once known. */
   shortlistCount?: number;
+  /** Durable dashboard summaries; absent only on jobs not yet backfilled. */
+  applicationCount?: number;
+  matchCount?: number;
   shortlistUpdatedAt?: string;
 }
 

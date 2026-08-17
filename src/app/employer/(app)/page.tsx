@@ -3,11 +3,16 @@ import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { getBusinessByOwner } from "@/lib/repos/businesses";
 import { listJobsByBusiness } from "@/lib/repos/jobs";
-import { getShortlistCounts } from "@/lib/repos/pipeline";
 import { formatRelativeTime } from "@/lib/format";
 import { getI18n } from "@/lib/i18n/server";
 import { areaLabel, employmentTypeLabel, roleLabel } from "@/lib/i18n/taxonomy";
-import { Badge, ButtonLink, Card, EmptyState, PageTitle } from "@/components/ui";
+import {
+  Badge,
+  ButtonLink,
+  Card,
+  EmptyState,
+  PageTitle,
+} from "@/components/ui";
 import { Icon } from "@/components/Icon";
 
 export default async function EmployerDashboard() {
@@ -17,9 +22,6 @@ export default async function EmployerDashboard() {
 
   const { locale, t } = await getI18n();
   const jobs = await listJobsByBusiness(business.id);
-  const withStats = await Promise.all(
-    jobs.map(async (job) => ({ job, ...(await getShortlistCounts(job.id)) })),
-  );
 
   return (
     <>
@@ -38,7 +40,7 @@ export default async function EmployerDashboard() {
         }
       />
 
-      {withStats.length === 0 ? (
+      {jobs.length === 0 ? (
         <EmptyState
           icon="briefcase"
           title={t("employer.noJobs")}
@@ -52,7 +54,7 @@ export default async function EmployerDashboard() {
         />
       ) : (
         <ul className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-          {withStats.map(({ job, total, applied, matched }) => (
+          {jobs.map((job) => (
             <li key={job.id}>
               <Link
                 href={`/employer/jobs/${job.id}`}
@@ -81,19 +83,23 @@ export default async function EmployerDashboard() {
                   <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-border/70 pt-3 text-sm">
                     <div>
                       <dd className="text-lg font-bold tabular-nums text-brand">
-                        {total}
+                        {job.shortlistCount ?? 0}
                       </dd>
-                      <dt className="text-xs text-muted">{t("employer.recommended")}</dt>
+                      <dt className="text-xs text-muted">
+                        {t("employer.recommended")}
+                      </dt>
                     </div>
                     <div>
                       <dd className="text-lg font-bold tabular-nums text-brand">
-                        {applied}
+                        {job.applicationCount ?? 0}
                       </dd>
-                      <dt className="text-xs text-muted">{t("employer.applicants")}</dt>
+                      <dt className="text-xs text-muted">
+                        {t("employer.applicants")}
+                      </dt>
                     </div>
                     <div>
                       <dd className="text-lg font-bold tabular-nums text-brand">
-                        {matched}
+                        {job.matchCount ?? 0}
                       </dd>
                       <dt className="text-xs text-muted">{t("chat.title")}</dt>
                     </div>

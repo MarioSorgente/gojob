@@ -248,6 +248,25 @@ describe("candidateApply", () => {
     expect(second.conversationId).toBe(first.conversationId);
     expect(db.dump("matches")).toHaveLength(1);
     expect(db.dump("conversations")).toHaveLength(1);
+    expect(db.docs.get(`jobs/${JOB_ID}`)).toMatchObject({
+      shortlistCount: 1,
+      applicationCount: 1,
+      matchCount: 1,
+    });
+  });
+
+  it("counts an application transition once across concurrent retries", async () => {
+    await seed();
+    await Promise.all([
+      candidateApply(JOB_ID, CANDIDATE),
+      candidateApply(JOB_ID, CANDIDATE),
+      candidateApply(JOB_ID, CANDIDATE),
+    ]);
+    expect(db.docs.get(`jobs/${JOB_ID}`)).toMatchObject({
+      shortlistCount: 1,
+      applicationCount: 1,
+      matchCount: 0,
+    });
   });
 
   it("preserves a later stage instead of rewinding it to applied", async () => {
@@ -277,6 +296,16 @@ describe("candidatePass", () => {
     expect(row.candidateSummary).toBeDefined();
     expect(row.candidateAction).toBe("passed");
     expect(row.stage).toBe("rejected");
+  });
+
+  it("decrements the application total only on the actual transition", async () => {
+    await seed();
+    await candidateApply(JOB_ID, CANDIDATE);
+    await Promise.all([
+      candidatePass(JOB_ID, CANDIDATE),
+      candidatePass(JOB_ID, CANDIDATE),
+    ]);
+    expect(db.docs.get(`jobs/${JOB_ID}`)?.applicationCount).toBe(0);
   });
 });
 
