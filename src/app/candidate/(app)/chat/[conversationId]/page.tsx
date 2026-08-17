@@ -19,7 +19,7 @@ export default async function CandidateChatPage({
   const conv = await getConversation(conversationId);
   if (!conv || !conv.participants.includes(user.uid)) notFound();
 
-  const [messages, interviews] = await Promise.all([
+  const [messagePage, interviews] = await Promise.all([
     getMessages(conversationId),
     listInterviewsForConversation(conversationId),
   ]);
@@ -31,7 +31,8 @@ export default async function CandidateChatPage({
       backLabel={t("chat.title")}
       backHref="/candidate/matches"
       conversationId={conversationId}
-      initialMessages={messages}
+      initialMessages={messagePage.items.toReversed()}
+      initialOlderCursor={messagePage.nextCursor}
       interviews={interviews}
       participantName={conv.businessName}
       roleName={conv.jobRole}

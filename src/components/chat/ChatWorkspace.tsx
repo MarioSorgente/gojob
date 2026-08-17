@@ -11,6 +11,7 @@ export function ChatWorkspace({
   conversationId,
   headerAction,
   initialMessages,
+  initialOlderCursor,
   interviews,
   participantName,
   roleName,
@@ -22,6 +23,7 @@ export function ChatWorkspace({
   conversationId: string;
   headerAction?: ReactNode;
   initialMessages: Message[];
+  initialOlderCursor: string | null;
   interviews: Interview[];
   participantName: string;
   roleName: string;
@@ -65,6 +67,7 @@ export function ChatWorkspace({
           conversationId={conversationId}
           uid={uid}
           initialMessages={initialMessages}
+          initialOlderCursor={initialOlderCursor}
         />
       </div>
     </section>

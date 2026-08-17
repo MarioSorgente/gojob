@@ -20,7 +20,7 @@ export default async function EmployerChatPage({
   const conv = await getConversation(conversationId);
   if (!conv || !conv.participants.includes(user.uid)) notFound();
 
-  const [messages, interviews] = await Promise.all([
+  const [messagePage, interviews] = await Promise.all([
     getMessages(conversationId),
     listInterviewsForConversation(conversationId),
   ]);
@@ -35,7 +35,8 @@ export default async function EmployerChatPage({
       headerAction={
         <HireButton jobId={conv.jobId} candidateId={conv.candidateId} />
       }
-      initialMessages={messages}
+      initialMessages={messagePage.items.toReversed()}
+      initialOlderCursor={messagePage.nextCursor}
       interviews={interviews}
       participantName={conv.candidateName}
       roleName={conv.jobRole}

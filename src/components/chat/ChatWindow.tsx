@@ -1,9 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import {
+  collection,
+  documentId,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+} from "firebase/firestore";
 import { getClientAuth, getClientDb } from "@/lib/firebase/client";
-import { markReadAction, sendMessageAction } from "@/app/_actions/chat";
+import {
+  loadOlderMessagesAction,
+  markReadAction,
+  sendMessageAction,
+} from "@/app/_actions/chat";
 import { useToast } from "@/components/Toast";
 import { Spinner } from "@/components/ui";
 import { Icon } from "@/components/Icon";
@@ -12,6 +23,12 @@ import { dayKey, formatDayLabel, formatTime } from "@/lib/format";
 import type { Locale } from "@/lib/i18n/config";
 import { cn } from "@/lib/cn";
 import type { Message } from "@/lib/types";
+import {
+  mergeMessages,
+  messageWindow,
+  MESSAGE_WINDOW_SIZE,
+  removeMessage,
+} from "./messageHistory";
 
 /**
  * Group consecutive messages into day buckets, and mark the ones that continue
@@ -19,8 +36,11 @@ import type { Message } from "@/lib/types";
  * stack of identical bubbles.
  */
 function groupByDay(messages: Message[], locale: Locale) {
-  const days: { key: string; iso: string; items: (Message & { continues: boolean })[] }[] =
-    [];
+  const days: {
+    key: string;
+    iso: string;
+    items: (Message & { continues: boolean })[];
+  }[] = [];
   for (const message of messages) {
     const key = dayKey(message.createdAt, locale);
     let day = days[days.length - 1];
@@ -41,18 +61,27 @@ export function ChatWindow({
   conversationId,
   uid,
   initialMessages,
+  initialOlderCursor,
 }: {
   conversationId: string;
   uid: string;
   initialMessages: Message[];
+  initialOlderCursor: string | null;
 }) {
   const { locale, t } = useI18n();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [olderCursor, setOlderCursor] = useState(initialOlderCursor);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [windowStart, setWindowStart] = useState(() =>
+    Math.max(0, initialMessages.length - MESSAGE_WINDOW_SIZE),
+  );
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const { show } = useToast();
   const endRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
+  const newestMessageId = messages.at(-1)?.id;
   useEffect(() => {
     let cancelled = false;
     let unsubscribe: (() => void) | undefined;
@@ -66,18 +95,32 @@ export function ChatWindow({
       .then(() => {
         if (cancelled) return;
         const q = query(
-          collection(getClientDb(), "conversations", conversationId, "messages"),
-          orderBy("createdAt", "asc"),
+          collection(
+            getClientDb(),
+            "conversations",
+            conversationId,
+            "messages",
+          ),
+          // A bounded newest-page listener avoids re-reading a long thread. It
+          // deliberately overlaps SSR; ID-based merging makes that race safe.
+          orderBy("createdAt", "desc"),
+          orderBy(documentId(), "desc"),
+          limit(50),
         );
         unsubscribe = onSnapshot(
           q,
           (snap) => {
-            setMessages(
-              snap.docs.map((d) => ({
-                id: d.id,
-                ...(d.data() as Omit<Message, "id">),
-              })),
-            );
+            for (const change of snap.docChanges()) {
+              const message = {
+                id: change.doc.id,
+                ...(change.doc.data() as Omit<Message, "id">),
+              };
+              setMessages((current) =>
+                change.type === "removed"
+                  ? removeMessage(current, message.id)
+                  : mergeMessages(current, [message]),
+              );
+            }
           },
           // Keep server-rendered messages when the browser has no Firebase
           // session (for example, after its local persistence was cleared).
@@ -100,9 +143,35 @@ export function ChatWindow({
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     endRef.current?.scrollIntoView({ behavior: reduced ? "auto" : "smooth" });
-  }, [messages]);
+  }, [newestMessageId]);
 
-  const days = useMemo(() => groupByDay(messages, locale), [messages, locale]);
+  const bounds = messageWindow(messages.length, windowStart);
+  const visibleMessages = messages.slice(bounds.start, bounds.end);
+  const days = useMemo(
+    () => groupByDay(visibleMessages, locale),
+    [visibleMessages, locale],
+  );
+
+  async function loadOlder() {
+    if (!olderCursor || loadingOlder) return;
+    setLoadingOlder(true);
+    const container = scrollRef.current;
+    const priorHeight = container?.scrollHeight ?? 0;
+    try {
+      const page = await loadOlderMessagesAction(conversationId, olderCursor);
+      setMessages((current) => mergeMessages(current, page.items));
+      setOlderCursor(page.nextCursor);
+      setWindowStart(0);
+      requestAnimationFrame(() => {
+        if (container)
+          container.scrollTop += container.scrollHeight - priorHeight;
+      });
+    } catch {
+      show(t("chat.loadOlderFailed"), "error");
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -140,6 +209,7 @@ export function ChatWindow({
   return (
     <div className="flex h-full flex-col">
       <div
+        ref={scrollRef}
         // `justify-end` on a flex column pins a short thread to the bottom;
         // once it overflows, `overflow-y-auto` takes over and it scrolls
         // normally. Top-aligned messages left a wall of empty space below.
@@ -147,9 +217,38 @@ export function ChatWindow({
         role="log"
         aria-live="polite"
         aria-label={t("chat.messages")}
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          if (messages.length <= 400) return;
+          if (element.scrollTop < 80 && bounds.start > 0)
+            setWindowStart(Math.max(0, bounds.start - 150));
+          if (
+            element.scrollHeight - element.scrollTop - element.clientHeight <
+              80 &&
+            bounds.end < messages.length
+          )
+            setWindowStart(
+              Math.min(
+                messages.length - MESSAGE_WINDOW_SIZE,
+                bounds.start + 150,
+              ),
+            );
+        }}
       >
+        {olderCursor && bounds.start === 0 && (
+          <button
+            type="button"
+            onClick={loadOlder}
+            disabled={loadingOlder}
+            className="mx-auto my-2 block rounded-full border border-border px-4 py-2 text-xs font-semibold text-brand disabled:opacity-50"
+          >
+            {loadingOlder ? <Spinner /> : t("chat.loadOlder")}
+          </button>
+        )}
         {messages.length === 0 && (
-          <p className="mt-6 text-center text-sm text-muted">{t("chat.matchHint")}</p>
+          <p className="mt-6 text-center text-sm text-muted">
+            {t("chat.matchHint")}
+          </p>
         )}
 
         {days.map((day) => (

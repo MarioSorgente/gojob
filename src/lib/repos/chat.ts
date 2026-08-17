@@ -76,14 +76,40 @@ export async function countUnreadForUser(uid: string): Promise<number> {
   return nonNegativeCount(snap.data()?.unreadConversationMessages);
 }
 
-export async function getMessages(conversationId: string): Promise<Message[]> {
-  const snap = await messagesCol(conversationId)
-    .orderBy("createdAt", "asc")
-    .get();
-  return snap.docs.map((d) => ({
-    id: d.id,
-    ...(d.data() as Omit<Message, "id">),
-  }));
+export const MESSAGE_PAGE_SIZE = 50;
+
+/** Newest-first, stable message pagination (the UI reverses each page). */
+export async function getMessages(
+  conversationId: string,
+  cursor: string | null = null,
+): Promise<Page<Message>> {
+  let query = messagesCol(conversationId)
+    .orderBy("createdAt", "desc")
+    .orderBy(FieldPath.documentId(), "desc");
+  const start = decodeCursor<{ createdAt: string; id: string }>(cursor);
+  if (
+    start &&
+    typeof start.createdAt === "string" &&
+    typeof start.id === "string"
+  ) {
+    query = query.startAfter(start.createdAt, start.id);
+  }
+  const snap = await query.limit(MESSAGE_PAGE_SIZE + 1).get();
+  const docs = snap.docs.slice(0, MESSAGE_PAGE_SIZE);
+  const last = docs.at(-1);
+  return {
+    items: docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Omit<Message, "id">),
+    })),
+    nextCursor:
+      snap.docs.length > MESSAGE_PAGE_SIZE && last
+        ? encodeCursor({
+            createdAt: last.data().createdAt as string,
+            id: last.id,
+          })
+        : null,
+  };
 }
 
 /**

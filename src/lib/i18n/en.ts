@@ -293,6 +293,8 @@ export const en = {
   "chat.messageLabel": "Message",
   "chat.send": "Send",
   "chat.sendFailed": "Message not sent",
+  "chat.loadOlder": "Load older messages",
+  "chat.loadOlderFailed": "Older messages could not be loaded",
   "chat.resend": "Resend",
   "chat.today": "Today",
   "chat.yesterday": "Yesterday",
