@@ -33,6 +33,7 @@ vi.mock("../firebase/admin", () => ({
 const {
   candidateApply,
   candidatePass,
+  countPendingInvitations,
   ensureShortlistEntry,
   getJobCandidate,
   getShortlist,
@@ -229,6 +230,7 @@ describe("candidateApply", () => {
     });
     expect(db.docs.get(`userStats/${CANDIDATE}`)).toEqual({
       unreadConversationMessages: 0,
+      pendingInvitationCount: 0,
     });
     expect(db.dump("matches")).toHaveLength(1);
   });
@@ -393,18 +395,38 @@ describe("setEmployerAction", () => {
 });
 
 describe("invitations", () => {
+  it("updates the pending summary exactly once across idempotent transitions", async () => {
+    await seed();
+    await ensureShortlistEntry(JOB_ID, CANDIDATE);
+
+    await setEmployerAction(JOB_ID, CANDIDATE, "invited");
+    await setEmployerAction(JOB_ID, CANDIDATE, "invited");
+    expect(await countPendingInvitations(CANDIDATE)).toBe(1);
+
+    await setEmployerAction(JOB_ID, CANDIDATE, "none");
+    await setEmployerAction(JOB_ID, CANDIDATE, "none");
+    expect(await countPendingInvitations(CANDIDATE)).toBe(0);
+  });
+
   it("accepting an invitation matches", async () => {
     await seed();
     await ensureShortlistEntry(JOB_ID, CANDIDATE);
     await setEmployerAction(JOB_ID, CANDIDATE, "invited");
 
     const pending = await listCandidateInvitations(CANDIDATE);
-    expect(pending).toHaveLength(1);
-    expect(pending[0].job.id).toBe(JOB_ID);
+    expect(pending.items).toHaveLength(1);
+    expect(pending.items[0].job.id).toBe(JOB_ID);
 
     const result = await respondToInvitation(JOB_ID, CANDIDATE, true);
     expect(result.matched).toBe(true);
-    expect(await listCandidateInvitations(CANDIDATE)).toHaveLength(0);
+    expect((await listCandidateInvitations(CANDIDATE)).items).toHaveLength(0);
+    expect(await countPendingInvitations(CANDIDATE)).toBe(0);
+
+    // A retried acceptance neither recreates the match nor decrements below 0.
+    const retry = await respondToInvitation(JOB_ID, CANDIDATE, true);
+    expect(retry.matched).toBe(true);
+    expect(retry.matchId).toBe(result.matchId);
+    expect(await countPendingInvitations(CANDIDATE)).toBe(0);
   });
 
   it("declining rejects the pair and clears the invitation", async () => {
@@ -415,7 +437,33 @@ describe("invitations", () => {
     const result = await respondToInvitation(JOB_ID, CANDIDATE, false);
     expect(result.matched).toBe(false);
     expect((await entry()).stage).toBe("rejected");
-    expect(await listCandidateInvitations(CANDIDATE)).toHaveLength(0);
+    expect((await listCandidateInvitations(CANDIDATE)).items).toHaveLength(0);
+    expect(await countPendingInvitations(CANDIDATE)).toBe(0);
+
+    await respondToInvitation(JOB_ID, CANDIDATE, false);
+    expect(await countPendingInvitations(CANDIDATE)).toBe(0);
+  });
+
+  it("pages the direct pending-invitation query without duplicates", async () => {
+    await seed();
+    const job2 = makeJob({ id: "job-2", role: "Barista" });
+    db.docs.set(`jobs/${job2.id}`, job2 as unknown as Record<string, unknown>);
+    await ensureShortlistEntry(JOB_ID, CANDIDATE);
+    await ensureShortlistEntry(job2.id, CANDIDATE);
+    await setEmployerAction(JOB_ID, CANDIDATE, "invited");
+    await setEmployerAction(job2.id, CANDIDATE, "invited");
+
+    const first = await listCandidateInvitations(CANDIDATE, null, 1);
+    expect(first.items).toHaveLength(1);
+    expect(first.nextCursor).toBeTruthy();
+    const second = await listCandidateInvitations(
+      CANDIDATE,
+      first.nextCursor,
+      1,
+    );
+    expect(second.items).toHaveLength(1);
+    expect(second.items[0].job.id).not.toBe(first.items[0].job.id);
+    expect(second.nextCursor).toBeNull();
   });
 });
 

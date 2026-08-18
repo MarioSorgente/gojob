@@ -13,12 +13,18 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t("candidate.invitationsTitle") };
 }
 
-export default async function InvitationsPage() {
+export default async function InvitationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cursor?: string }>;
+}) {
   const user = await requireRole("candidate");
-  const [invites, { locale, t }] = await Promise.all([
-    listCandidateInvitations(user.uid),
+  const params = await searchParams;
+  const [invitePage, { locale, t }] = await Promise.all([
+    listCandidateInvitations(user.uid, params.cursor ?? null),
     getI18n(),
   ]);
+  const invites = invitePage.items;
 
   return (
     <>
@@ -50,17 +56,36 @@ export default async function InvitationsPage() {
                 <h2 className="mt-0.5 text-lg font-bold leading-tight">
                   {roleLabel(job.role, locale)}
                 </h2>
-                <JobMeta job={job} locale={locale} t={t} showEmploymentType className="mt-2" />
+                <JobMeta
+                  job={job}
+                  locale={locale}
+                  t={t}
+                  showEmploymentType
+                  className="mt-2"
+                />
                 {entry.reasons.length > 0 && (
                   <div className="mt-3">
                     <ReasonList reasons={entry.reasons} limit={3} />
                   </div>
                 )}
-                <InvitationActions jobId={job.id} businessName={job.businessName} />
+                <InvitationActions
+                  jobId={job.id}
+                  businessName={job.businessName}
+                />
               </Card>
             </li>
           ))}
         </ul>
+      )}
+      {invitePage.nextCursor && (
+        <div className="mt-6 text-center">
+          <ButtonLink
+            href={`/candidate/invitations?cursor=${encodeURIComponent(invitePage.nextCursor)}`}
+            variant="outline"
+          >
+            {t("common.loadMore")}
+          </ButtonLink>
+        </div>
       )}
     </>
   );

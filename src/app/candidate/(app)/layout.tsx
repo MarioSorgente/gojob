@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
-import { listCandidateInvitations } from "@/lib/repos/pipeline";
+import { countPendingInvitations } from "@/lib/repos/pipeline";
 import { countUnreadForUser } from "@/lib/repos/chat";
 import { AppShell } from "@/components/AppShell";
 import type { NavItem } from "@/components/navigation";
@@ -19,9 +19,9 @@ export default async function CandidateAppLayout({
   // to throw from the layout, which 500'd every page underneath it. A missing
   // badge is a far better outcome than an unusable app.
   const [invites, unread] = await Promise.all([
-    listCandidateInvitations(user.uid).catch((error) => {
+    countPendingInvitations(user.uid).catch((error) => {
       console.error("Invitation badge failed", error);
-      return [];
+      return 0;
     }),
     countUnreadForUser(user.uid).catch((error) => {
       console.error("Unread badge failed", error);
@@ -38,7 +38,7 @@ export default async function CandidateAppLayout({
       href: "/candidate/invitations",
       label: t("nav.invites"),
       icon: "sparkle",
-      badge: invites.length || undefined,
+      badge: invites || undefined,
     },
     // The employer side has always shown an unread count here; the candidate
     // side didn't, so a new message was invisible until they opened Chats.
