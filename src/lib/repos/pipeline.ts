@@ -33,6 +33,8 @@ const isMatch = (entry: Partial<JobCandidate>) =>
   entry.stage === "matched" ||
   entry.stage === "interview" ||
   entry.stage === "hired";
+const isPendingInvitation = (entry: Partial<JobCandidate>) =>
+  entry.employerAction === "invited" && entry.candidateAction === "none";
 
 function count(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value)
@@ -49,10 +51,14 @@ async function transitionShortlistEntry(
   const db = adminDb();
   const rowRef = shortlistDoc(jobId, candidateId);
   const jobRef = jobsCol().doc(jobId);
+  const candidateStatsRef = db
+    .collection(COLLECTIONS.userStats)
+    .doc(candidateId);
   return db.runTransaction(async (transaction) => {
-    const [rowSnap, jobSnap] = await Promise.all([
+    const [rowSnap, jobSnap, candidateStatsSnap] = await Promise.all([
       transaction.get(rowRef),
       transaction.get(jobRef),
+      transaction.get(candidateStatsRef),
     ]);
     if (!rowSnap.exists) throw new Error("Shortlist entry not found");
     if (!jobSnap.exists) throw new Error("Job not found");
@@ -62,6 +68,8 @@ async function transitionShortlistEntry(
     const applicationDelta =
       Number(isApplication(after)) - Number(isApplication(before));
     const matchDelta = Number(isMatch(after)) - Number(isMatch(before));
+    const invitationDelta =
+      Number(isPendingInvitation(after)) - Number(isPendingInvitation(before));
     transaction.set(rowRef, patch, { merge: true });
     if (applicationDelta || matchDelta) {
       const job = jobSnap.data() as Partial<Job>;
@@ -73,6 +81,19 @@ async function transitionShortlistEntry(
             count(job.applicationCount) + applicationDelta,
           ),
           matchCount: Math.max(0, count(job.matchCount) + matchDelta),
+        },
+        { merge: true },
+      );
+    }
+    if (invitationDelta) {
+      transaction.set(
+        candidateStatsRef,
+        {
+          pendingInvitationCount: Math.max(
+            0,
+            count(candidateStatsSnap.data()?.pendingInvitationCount) +
+              invitationDelta,
+          ),
         },
         { merge: true },
       );
@@ -89,6 +110,17 @@ function relationshipId(jobId: string, candidateId: string): string {
 export interface HydratedEntry {
   entry: JobCandidate;
   job: Job;
+}
+
+/** Pending invitation total, served by one durable summary-document read. */
+export async function countPendingInvitations(
+  candidateId: string,
+): Promise<number> {
+  const snap = await adminDb()
+    .collection(COLLECTIONS.userStats)
+    .doc(candidateId)
+    .get();
+  return count(snap.data()?.pendingInvitationCount);
 }
 
 // ---------------------------------------------------------------------------
@@ -282,17 +314,52 @@ export async function listCandidateActions(
   return out;
 }
 
-/** Invitations awaiting the candidate's response. */
+interface InvitationCursor {
+  updatedAt: string;
+  jobId: string;
+}
+
+/** Invitations awaiting the candidate's response, queried and hydrated one page at a time. */
 export async function listCandidateInvitations(
   candidateId: string,
-): Promise<HydratedEntry[]> {
-  const entries = (await candidateEntries(candidateId)).filter(
-    (e) =>
-      e.employerAction === "invited" &&
-      e.candidateAction === "none" &&
-      e.stage !== "matched",
+  cursor: string | null = null,
+  pageSize = PAGE_SIZE,
+): Promise<Page<HydratedEntry>> {
+  const size =
+    Number.isInteger(pageSize) && pageSize > 0
+      ? Math.min(pageSize, 100)
+      : PAGE_SIZE;
+  let query = adminDb()
+    .collectionGroup(COLLECTIONS.shortlist)
+    .where("candidateId", "==", candidateId)
+    .where("employerAction", "==", "invited")
+    .where("candidateAction", "==", "none")
+    .orderBy("updatedAt", "desc")
+    .orderBy("jobId", "desc");
+  const start = decodeCursor<InvitationCursor>(cursor);
+  if (
+    start &&
+    typeof start.updatedAt === "string" &&
+    typeof start.jobId === "string"
+  ) {
+    query = query.startAfter(start.updatedAt, start.jobId);
+  }
+  const snap = await query.limit(size + 1).get();
+  const docs = snap.docs.slice(0, size);
+  const items = await hydrateWithJobs(
+    docs.map((doc) => doc.data() as JobCandidate),
   );
-  return hydrateWithJobs(entries);
+  const last = docs.at(-1);
+  return {
+    items,
+    nextCursor:
+      snap.docs.length > size && last
+        ? encodeCursor({
+            updatedAt: last.data().updatedAt as string,
+            jobId: last.data().jobId as string,
+          })
+        : null,
+  };
 }
 
 export async function listCandidateApplications(
@@ -396,11 +463,19 @@ async function createMatch(
 
     transaction.set(matchRef, match);
     transaction.set(convRef, conversation);
-    if (!employerStats.exists) {
-      transaction.set(employerStatsRef, { unreadConversationMessages: 0 });
+    if (typeof employerStats.data()?.unreadConversationMessages !== "number") {
+      transaction.set(
+        employerStatsRef,
+        { unreadConversationMessages: 0 },
+        { merge: true },
+      );
     }
-    if (!candidateStats.exists) {
-      transaction.set(candidateStatsRef, { unreadConversationMessages: 0 });
+    if (typeof candidateStats.data()?.unreadConversationMessages !== "number") {
+      transaction.set(
+        candidateStatsRef,
+        { unreadConversationMessages: 0 },
+        { merge: true },
+      );
     }
     transaction.set(
       rowRef,

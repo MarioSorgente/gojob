@@ -73,6 +73,17 @@
         { "fieldPath": "businessId", "order": "ASCENDING" },
         { "fieldPath": "employerAction", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "shortlist",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "candidateId", "order": "ASCENDING" },
+        { "fieldPath": "employerAction", "order": "ASCENDING" },
+        { "fieldPath": "candidateAction", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "jobId", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
